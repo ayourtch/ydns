@@ -1,5 +1,9 @@
-%%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "dns.h"
 
+%%{
 machine dns;
 alphtype unsigned char;
 
@@ -22,22 +26,21 @@ response_truncated = 0x82 | 0x83 | 0x86 | 0x87;
 response_full = 0x80 | 0x81 | 0x84 | 0x85;
 cf_byte1 = response_truncated | response_full;
 
+action rc_is_no_error        { DNS_RC(*p) == 0 }
+action rc_is_format_error    { DNS_RC(*p) == 1 }
+action rc_is_server_failure  { DNS_RC(*p) == 2 }
+action rc_is_name_error      { DNS_RC(*p) == 3 }
+action rc_is_not_implemented { DNS_RC(*p) == 4 }
+action rc_is_refused         { DNS_RC(*p) == 5 }
+action rc_is_reserved        { (DNS_RC(*p) >= 6) && (DNS_RC(*p) <= 0xf) }
 
-rc_no_error = (0x00 | 0x20 | 0x80 | 0xc0);
-rc_format_error = 0x01 | 0x21 | 0x81 | 0xc1;
-rc_server_failure = 0x02 | 0x22 | 0x82 | 0xc2;
-rc_name_error = 0x03 | 0x23 | 0x83 | 0xc3;
-rc_not_implemented = 0x04 | 0x24 | 0x84 | 0xc4;
-rc_refused = 0x05 | 0x25 | 0x85 | 0xc5;
-rc_reserved = 0x06 .. 0x0f | 0x26 .. 0x2f | 0x86 .. 0x8f | 0xc6 .. 0xcf;
-
-cf_byte2 = rc_no_error | 
-           rc_format_error | 
-           rc_server_failure |
-           rc_name_error |
-           rc_not_implemented |
-           rc_refused | 
-           rc_reserved;
+cf_byte2 = any when rc_is_no_error | 
+           any when rc_is_format_error | 
+           any when rc_is_server_failure |
+           any when rc_is_name_error |
+           any when rc_is_not_implemented |
+           any when rc_is_refused | 
+           any when rc_is_reserved;
  
 codeflags = cf_byte1 cf_byte2;
 
@@ -128,10 +131,6 @@ main := req_header questions @{ debug(DNS_PARSE,"time for some answers\n"); } an
 
 }%%
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "dns.h"
 
 %%write data;
 

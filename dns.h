@@ -6,3 +6,5 @@ int parse_dns_reply(unsigned char *buf, int buflen);
 #else
 #define debug(what, ...)
 #endif
+
+#define DNS_RC(x) ((x) & 0x0f)
