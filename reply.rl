@@ -3,15 +3,19 @@
 machine dns;
 alphtype unsigned char;
 
+# The original DNS name types
+# Starts only with a letter
 ll = [a-zA-Z];
+# Then can have maybe some letters numbers and dashes
 ldh = [a-zA-Z0-9] | '-';
+# and ends with a letter or digit
 ld = [a-zA-Z0-9];
 
+# shorthand for any value
 x = any;
 
 include "label.rl";
 
-req_id = any any;
 
 
 response_truncated = 0x82 | 0x83 | 0x86 | 0x87;
@@ -40,6 +44,7 @@ codeflags = cf_byte1 cf_byte2;
 uint16 = any @{ savebyte1 = *p; } any @{ printf("RGL: UINT16: %04x\n", (unsigned int)256*savebyte1 + *p); };
 uint32 = any any any any;
 
+req_id = uint16 >{ printf("RGL: Request id\n"); };
 qdcount = uint16 >{ printf("RGL: Question count\n"); };
 ancount = uint16 >{ printf("RGL: Answer count\n"); };
 nscount = uint16 >{ printf("RGL: NS count\n"); };
@@ -109,12 +114,11 @@ rr_ns = 2 0 1 attl cname_len @call_encoded_name;
 rr_soa = 6 0 1 soa_len @call_encoded_name @call_encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
 rr_cname = 5 0 1 attl cname_len @call_encoded_name; 
-rr_aaaa = 0x1c 0 1 attl 0 16 ipv6_addr;
+rr_aaaa = 0x1c 0 1 attl 0 16 @{ printf("Getting IPv6 addr\n"); } ipv6_addr;
 
-rr_some = rr_a | rr_ns | rr_cname | rr_aaaa;
+rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
 
-# answer = rr_a | rr_cname | rr_aaaa;
-answer = any_dummy @call_encoded_name_fhold 0 rr_some >{ printf("A/AAAA, c: %02x\n", *p); };
+answer = any_dummy @call_encoded_name_fhold 0 rr_whatever >{ printf("RR type: %02x\n", *p); } ;
 
 answers = answer+ >{ printf("Entering answers\n"); };
 
