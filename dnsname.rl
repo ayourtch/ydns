@@ -22,14 +22,22 @@ letter_or_digit = [a-zA-Z0-9];
 
 action in_label { runlen > 0 }
 action not_in_label { runlen <= 0 }
+action check_label_len { 
+    if(runlen >0) { 
+      debug(DNS_PARSE, "Label FSM exit too early, left runlen: %d\n", runlen);
+       return 0; 
+    } 
+}
 
-label =
+label_itself =
       1..63 @{ runlen = *p-2; seglen = *p; }
             letter_only @debug_label_s
             (
-              ((dash when in_label) |
-              (letter_or_digit %debug_label_e))
-            @{ runlen--; } )**;
+              (dash when in_label | letter_or_digit) %debug_label_e
+                 @{ runlen--; } 
+            )**;
+
+label = label_itself %check_label_len;
 
 name_from_offset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
 end_of_name = name_from_offset | 0;

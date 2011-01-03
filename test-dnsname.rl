@@ -46,6 +46,14 @@ int parsename(unsigned char *buf, int buflen) {
 
 int main(int argc, char *argv[]) {
   assert(TEST("\003foo\006domain\003com\000"));
+  assert(TEST("\003f01\006domain\003com\000"));
+  assert(TEST("\003f-1\006domain\003com\000"));
+  assert(!TEST("\003f_1\006domain\003com\000"));
   assert(TEST("\022safebrowsing-cache\006google\003com"));
+  assert(TEST("\022safebrowsing-cache\006google\003com\0xc000"));
+  assert(!TEST("\022safebrowsingcache-\006google\003com"));
+  assert(!TEST("\0225afebrowsingcache-\006google\003com"));
+  assert(!TEST("\0225afebrowingcache-\006google\003com"));
+  printf("All tests passed.\n");
   exit(0);
 }
