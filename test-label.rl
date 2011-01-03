@@ -17,7 +17,7 @@ machine dns;
 
 include "dnsname.rl";
 
-main := label 0 @{ printf("LABEL HAPPY END!\n"); res = 1; };
+main := label* 0 @{ printf("LABEL HAPPY END!\n"); res = 1; };
 
 }%%
 
