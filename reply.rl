@@ -57,11 +57,17 @@ cf_byte2 = any when rc_is_no_error |
 codeflags = cf_byte1 cf_byte2;
 
 uint16 = any @{ uint8_acc[0] = *p; } 
-             any @{ uint16_acc = (unsigned short)256*uint8_acc[0] + *p; };
+             any @{ uint8_acc[1] = *p;
+                    uint16_acc = (unsigned short)256*uint8_acc[0] + 
+                                                 uint8_acc[1]; };
 uint32 = any @{ uint8_acc[0] = *p; }
              any @{ uint8_acc[1] = *p; }
                  any @{ uint8_acc[2] = *p; }
-                    any @{ uint8_acc[3] = *p; };
+                    any @{ uint8_acc[3] = *p;
+                           uint32_acc = (unsigned long)uint8_acc[3] + 
+                                        256*(uint8_acc[2] +
+                                         256*(uint8_acc[1] +
+                                          256*uint8_acc[0])); };
 
 req_id = uint16 >{ debug(DNS_PARSE,"RGL: Request id\n"); };
 qdcount = uint16 >{ debug(DNS_PARSE,"RGL: Question count\n"); };
@@ -97,7 +103,8 @@ question = qname qtype qclass;
 questions = question;
 
 ipv4_addr = uint32;
-ipv6_addr = any {16};
+ipv6_addr = any @{ acc8pos = 0; uint8_acc[0] = *p; }
+            (any @{ uint8_acc[acc8pos++] = *p; }) {15};
 
 # RDATA consumer (not used now, but maybe sometime)
 
@@ -148,11 +155,13 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int cs, res = 0;
   int seglen = 0;
   unsigned char uint8_acc[16];
+  unsigned int acc8pos;
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
   unsigned short runlen;
   unsigned short uint16_acc;
+  unsigned long uint32_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
