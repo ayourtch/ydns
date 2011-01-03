@@ -31,19 +31,28 @@ action check_label_len {
     } 
 }
 
-label_itself =
-      1..63 when not_in_label 
-            @{ runlen = *p-2; seglen = *p; 
-               if (acchpos > 0) {
-                 hostname_acc[acchpos++] = '.'; 
-                 /* this is not the first label, so let the dot live */ 
-               }
-               if(acchpos + *p < HOSTNAME_SZ) {
-                 hostname_acc[acchpos + *p] = 0; 
-               }
+action label_start {
+    runlen = *p-2; seglen = *p; 
+    if (p + seglen >= pe) {
+      /* We're going to fall past the buffer. Bail. */
+      debug(DNS_PARSE, "Label stretches past buffer\n");
+      return 0;
+    }
+    if (acchpos > 0) {
+      hostname_acc[acchpos++] = '.'; 
+      /* this is not the first label, so put the dot inbetween. */ 
+    }
+    if(acchpos + *p < HOSTNAME_SZ) {
+      hostname_acc[acchpos + *p] = 0; 
+    } else {
+      debug(DNS_PARSE, "Hostname too long");
+      return 0;
+    }
+    // debug(DNS_PARSE, "LABEL: %d\n", seglen); 
+}
 
-               // debug(DNS_PARSE, "LABEL: %d\n", seglen); 
-            }
+label_itself =
+      1..63 when not_in_label @label_start
             letter_only @hostname_char_s
             (
               (dash when in_label | letter_or_digit) @hostname_char_c
