@@ -31,6 +31,7 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
   unsigned char *p = (void *) buf;
+  unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
   int runlen = 0xdead; // corrupt deliberately

@@ -40,9 +40,15 @@ label =  label_itself %check_label_len;
 
 labels := label* $!{fhold;fret;};
 
+u_labels := 1..63 @{ fhold; } label* $!{fhold; printf("Returning from %d to %d\n", p-buf, sav_p-buf); p = sav_p; fret;};
+
 action uncompress_name {
   uint16_acc = 256*uint8_acc[0] + *p;
   debug(DNS_PARSE, "FIXME: extract compressed part of name\n");
+  sav_p = p;
+  p = buf + uint16_acc -1;
+  printf("Jump from %d to %d (content: 0x%02x)\n", sav_p - buf, p-buf, *p);
+  fcall u_labels;
 }
 
 name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; }

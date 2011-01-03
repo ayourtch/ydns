@@ -132,6 +132,7 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
   unsigned char *p = (void *) buf;
+  unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
   int runlen; /* We decrement it. So, better signed than sorry. */
