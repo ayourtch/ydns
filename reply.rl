@@ -7,28 +7,6 @@
 machine dns;
 alphtype unsigned char;
 
-# The original DNS name types
-# Starts only with a letter
-letter_only = [a-zA-Z];
-# Then can have maybe some letters numbers and dashes
-letter_digit_dash = [a-zA-Z0-9] | '-';
-# and ends with a letter or digit
-letter_or_digit = [a-zA-Z0-9];
-
-
-action in_label { runlen-- > 0 }
-
-label_itself =
-      1 @{ seglen = 1; runlen = 0; } letter_only |
-      2 @{ seglen = 2; runlen = 0; } letter_only letter_or_digit |
-      3..63 @{ runlen = *p-2; seglen = *p; } 
-            letter_only (letter_digit_dash when in_label)+ letter_or_digit;
-
-label = 
-  1..63 @{ debug(LABEL_DEBUG, "LABEL: %d, ofs: %d\n", *p, p-buf); fhold; } 
-        label_itself;
-
-
 
 action response_is_truncated   { (*p | 0x5) == 0x87 }
 action response_is_full        { (*p | 0x5) == 0x85 }
@@ -77,11 +55,8 @@ arcount = uint16 >{ debug(DNS_PARSE,"RGL: AR count\n"); };
 
 req_header = req_id codeflags qdcount ancount nscount arcount;
 
-# fixme: EDNS0 will be here. Maybe.
-name_from_offset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
-end_of_name = name_from_offset | 0;
-
-dnsname = label* end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
+# That beast is tricky.
+include "dnsname.rl";
 
 encoded_name = dnsname;
 
@@ -159,7 +134,7 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
-  unsigned short runlen;
+  int runlen; /* We decrement it. So, better signed than sorry. */
   unsigned short uint16_acc;
   unsigned long uint32_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
