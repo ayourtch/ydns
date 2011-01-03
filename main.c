@@ -11,9 +11,9 @@
 #include "dns.h"
 
 
-char buf[32768];
+unsigned char buf[32768];
 
-int store_8(char **pp, char *pe, uint8_t val) {
+int store_8(unsigned char **pp, unsigned char *pe, uint8_t val) {
   if(*pp == pe) {
     return 0;
   } else {
@@ -21,13 +21,13 @@ int store_8(char **pp, char *pe, uint8_t val) {
     return 1;
   }
 }
-int store_16(char **pp, char *pe, uint16_t val) {
+int store_16(unsigned char **pp, unsigned char *pe, uint16_t val) {
   return (store_8(pp, pe, val >> 8) && store_8(pp, pe, val & 0xff));
 }
 
-int store_str(char **pp, char *pe, char *str) {
-  char *pce = str;
-  char *pc = str;
+int store_str(unsigned char **pp, unsigned char *pe, char *str) {
+  unsigned char *pce = (void *)str;
+  unsigned char *pc = (void *)str;
   int len;
   while(*pc && (*pp < pe)) {
     /* find the length of the next name segment */
@@ -51,9 +51,9 @@ int store_str(char **pp, char *pe, char *str) {
   }
 }
 
-int encode_request(char **buf, int buf_sz, int type, char *name) {
-  char *p = *buf;
-  char *pe = p + buf_sz;
+int encode_request(unsigned char **buf, int buf_sz, int type, char *name) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
   uint16_t id = 0x1234;
   /* +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
      |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
@@ -69,7 +69,7 @@ int encode_request(char **buf, int buf_sz, int type, char *name) {
   
   int result = 1;
 
-  debug("Encoding start, p:%p, pe: %p\n", p, pe);
+  debug("Encoding start, p:%p, pe: %p\n", (void *)p, (void *)pe);
 
   result = result && store_16(&p, pe, id);
   result = result && store_16(&p, pe, opcode_flags);
@@ -91,10 +91,10 @@ int main() {
   struct sockaddr_in server_addr;
   struct hostent *host;
   char send_data[1024] = "api.twitter.com";
-  char *p = buf;
+  unsigned char *p = buf;
   int enclen;
   int nread;
-  int sockaddr_sz = sizeof(struct sockaddr);
+  socklen_t sockaddr_sz = sizeof(struct sockaddr);
 
   host= (struct hostent *) gethostbyname((char *)"192.168.1.1");
 
@@ -120,5 +120,6 @@ int main() {
   } else {
         printf("Could not encode name!\n");
   }
+  return 0;
 }
 
