@@ -21,7 +21,7 @@ action in_label { runlen > 0 }
 action not_in_label { runlen < 0 }
 action check_label_len { 
     if(runlen >0) { 
-      debug(DNS_PARSE, "Label FSM exit too early, left runlen: %d\n", runlen);
+       debug(DNS_PARSE, "Label FSM exit too early, left runlen: %d\n", runlen);
        return 0; 
     } 
 }
