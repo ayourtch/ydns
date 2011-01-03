@@ -10,7 +10,7 @@ machine dns;
 
 include "dnsname.rl";
 
-main := dnsname @{ printf("HAPPY END!\n"); res = 1; };
+main := label* 0 @{ printf("LABEL HAPPY END!\n"); res = 1; };
 
 }%%
 
@@ -24,12 +24,14 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
   unsigned char hostname_acc[HOSTNAME_SZ];
-  unsigned int acchpos;
+  unsigned int acchpos = 0;
   unsigned char *p = (void *) buf;
-  unsigned char *sav_p; 
+  unsigned char *sav_p;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
-  int runlen = 0xdead; // corrupt deliberately
+  /* runlen gets reset to -1 at the start of domainname, 
+     which we do not do here */
+  int runlen = -1;
   unsigned short uint16_acc;
   unsigned long uint32_acc;
   int top;
@@ -39,22 +41,19 @@ int parsename(unsigned char *buf, int buflen) {
   %%write exec;
   debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %d, c: 0x%02x\n",
           res, seglen, p-buf, *p);
-  if (res == 1 ) {
-    printf("Decoded hostname: '%s'\n", hostname_acc);
-  }
   return res;
 }
 
 int main(int argc, char *argv[]) {
-  assert(TEST("\003foo\006domain\003com\000"));
-  assert(TEST("\003f01\006domain\003com\000"));
-  assert(TEST("\003f-1\006domain\003com\000"));
-  assert(!TEST("\003f_1\006domain\003com\000"));
-  assert(TEST("\022safebrowsing-cache\006google\003com"));
-  assert(TEST("\022safebrowsing-cache\006google\003com\0xc000"));
-  assert(!TEST("\022safebrowsingcache-\006google\003com"));
-  assert(!TEST("\0225afebrowsingcache-\006google\003com"));
-  assert(!TEST("\0225afebrowingcache-\006google\003com"));
+  assert(TEST("\003foo"));
+  assert(TEST("\003f01"));
+  assert(TEST("\003f-1"));
+  assert(!TEST("\003f_1"));
+  assert(TEST("\022safebrowsing-cache"));
+  assert(TEST("\022safebrowsing-cache"));
+  assert(!TEST("\022safebrowsingcache-"));
+  assert(!TEST("\0225afebrowsingcache-"));
+  assert(!TEST("\0225afebrowingcache-"));
   printf("All tests passed.\n");
   exit(0);
 }

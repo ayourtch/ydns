@@ -37,7 +37,7 @@ int store_str(unsigned char **pp, unsigned char *pe, char *str) {
     /* try to store this name segment to target buffer */
     if(store_8(pp, pe, (uint8_t) len)) {
       while(pce != pc) {
-        debug(STORE_STR, "storing '%c'\n", *pc);
+        // debug(STORE_STR, "storing '%c'\n", *pc);
         if(!store_8(pp, pe, *pc++)) { return 0; };
       }
     }

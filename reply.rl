@@ -37,7 +37,8 @@ codeflags = cf_byte1 cf_byte2;
 uint16 = any @{ uint8_acc[0] = *p; } 
              any @{ uint8_acc[1] = *p;
                     uint16_acc = (unsigned short)256*uint8_acc[0] + 
-                                                 uint8_acc[1]; };
+                                                 uint8_acc[1]; 
+                  };
 uint32 = any @{ uint8_acc[0] = *p; }
              any @{ uint8_acc[1] = *p; }
                  any @{ uint8_acc[2] = *p; }
@@ -48,10 +49,10 @@ uint32 = any @{ uint8_acc[0] = *p; }
                                           256*uint8_acc[0])); };
 
 req_id = uint16 >{ debug(DNS_PARSE,"RGL: Request id\n"); };
-qdcount = uint16 >{ debug(DNS_PARSE,"RGL: Question count\n"); };
-ancount = uint16 >{ debug(DNS_PARSE,"RGL: Answer count\n"); };
-nscount = uint16 >{ debug(DNS_PARSE,"RGL: NS count\n"); };
-arcount = uint16 >{ debug(DNS_PARSE,"RGL: AR count\n"); };
+qdcount = uint16 @{ debug(DNS_PARSE,"RGL: Question count: %d\n", uint16_acc); };
+ancount = uint16 @{ debug(DNS_PARSE,"RGL: Answer count: %d\n", uint16_acc); };
+nscount = uint16 @{ debug(DNS_PARSE,"RGL: NS count: %d\n", uint16_acc); };
+arcount = uint16 @{ debug(DNS_PARSE,"RGL: AR count: %d\n", uint16_acc); };
 
 req_header = req_id codeflags qdcount ancount nscount arcount;
 
@@ -60,11 +61,11 @@ include "dnsname.rl";
 
 encoded_name = dnsname;
 
-qname = encoded_name >{ debug(DNS_PARSE, "RGL: Question Name\n"); };
-qtype = uint16 >{ debug(DNS_PARSE,"RGL: QType\n"); };
-qclass = uint16 >{ debug(DNS_PARSE,"RGL: QClass\n"); };
+qname = encoded_name @{ debug(DNS_PARSE, "RGL: Question Name: '%s'\n", hostname_acc); };
+qtype = uint16 @{ debug(DNS_PARSE,"RGL: QType %d\n", uint16_acc); };
+qclass = uint16 @{ debug(DNS_PARSE,"RGL: QClass %d\n", uint16_acc); };
 
-aname = encoded_name >{ debug(DNS_PARSE, "RGL: Answer Name\n"); };
+aname = encoded_name @{ debug(DNS_PARSE, "RGL: Answer Name: '%s'\n", hostname_acc); };
 atype = uint16;
 aclass = uint16;
 attl = uint32;
@@ -106,14 +107,16 @@ soa_minimum = uint32;
 rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr;
 rr_ns = 2 0 1 attl cname_len encoded_name; 
 
-rr_soa = 6 0 1 soa_len encoded_name encoded_name 
+rr_soa = 6 0 1 attl soa_len encoded_name encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
-rr_cname = 5 0 1 attl cname_len encoded_name; 
+rr_cname = 5 0 1 attl cname_len encoded_name @{ debug(DNS_PARSE, "CNAME: %s\n", hostname_acc); }; 
 rr_aaaa = 0x1c 0 1 attl 0 16 @{ debug(DNS_PARSE,"Getting IPv6 addr\n"); } ipv6_addr;
 
 rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
 
-answer = aname 0 rr_whatever >{ debug(DNS_PARSE,"RR type: %02x\n", *p); } ;
+answer = aname 
+             @{ debug(DNS_PARSE, "Answer Name: '%s'\n", hostname_acc); }
+         0 rr_whatever >{ debug(DNS_PARSE,"RR type: %02x, A Name: '%s'\n", *p, hostname_acc); } ;
 
 answers = answer+ >{ debug(DNS_PARSE,"Entering answers\n"); };
 
@@ -131,12 +134,18 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int seglen = 0;
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
+  unsigned char hostname_acc[HOSTNAME_SZ];
+  unsigned int acchpos;
   unsigned char *p = (void *) buf;
+  unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
   int runlen; /* We decrement it. So, better signed than sorry. */
   unsigned short uint16_acc;
   unsigned long uint32_acc;
+  int top;
+  int stack[10];
+  
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
