@@ -56,8 +56,12 @@ cf_byte2 = any when rc_is_no_error |
  
 codeflags = cf_byte1 cf_byte2;
 
-uint16 = any @{ savebyte1 = *p; } any @{ debug(DNS_PARSE,"RGL: UINT16: %04x\n", (unsigned int)256*savebyte1 + *p); };
-uint32 = any any any any;
+uint16 = any @{ uint8_acc[0] = *p; } 
+             any @{ uint16_acc = (unsigned short)256*uint8_acc[0] + *p; };
+uint32 = any @{ uint8_acc[0] = *p; }
+             any @{ uint8_acc[1] = *p; }
+                 any @{ uint8_acc[2] = *p; }
+                    any @{ uint8_acc[3] = *p; };
 
 req_id = uint16 >{ debug(DNS_PARSE,"RGL: Request id\n"); };
 qdcount = uint16 >{ debug(DNS_PARSE,"RGL: Question count\n"); };
@@ -104,11 +108,14 @@ question = any_dummy @call_encoded_name_fhold qtype qclass;
 # here.
 questions = question;
 
-ipv4_addr = any any any any;
-ipv6_addr = any{16};
+ipv4_addr = uint32;
+ipv6_addr = any {16};
 
+action in_rdata { runlen-- > 0 }
 # Magic jump
-ardata = any @{ savebyte1 = *p; } any @{ savebyte2 = *p; p += (unsigned short)256*savebyte1 + savebyte2; };
+ardata = any @{ uint8_acc[0] = *p; } 
+             any @{ runlen = (unsigned short)256*uint8_acc[0] + *p; }
+                 (any when in_rdata)**;
 
 check_ardata := ardata @{ fret; };
 # check_ardata := any >{ debug(DNS_PARSE,"ARDATA\n"); };
@@ -151,11 +158,11 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int seglen = 0;
   int top = 20;
   int stack[100];
-  unsigned char savebyte1;
-  unsigned char savebyte2;
+  unsigned char uint8_acc[16];
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen + 1;
   unsigned short runlen;
+  unsigned short uint16_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
