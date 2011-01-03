@@ -106,7 +106,7 @@ soa_minimum = uint32;
 rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr;
 rr_ns = 2 0 1 attl cname_len encoded_name; 
 
-rr_soa = 6 0 1 soa_len encoded_name encoded_name 
+rr_soa = 6 0 1 attl soa_len encoded_name encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
 rr_cname = 5 0 1 attl cname_len encoded_name; 
 rr_aaaa = 0x1c 0 1 attl 0 16 @{ debug(DNS_PARSE,"Getting IPv6 addr\n"); } ipv6_addr;
