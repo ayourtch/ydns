@@ -68,31 +68,24 @@ arcount = uint16 >{ debug(DNS_PARSE,"RGL: AR count\n"); };
 req_header = req_id codeflags qdcount ancount nscount arcount;
 
 # fixme: EDNS0 will be here. Maybe.
-nameoffset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
-end_of_name = nameoffset|0;
+name_from_offset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
+end_of_name = name_from_offset | 0;
 
-dnsname = (end_of_name | label+ end_of_name) @{ debug(DNS_PARSE,"RGL: Exiting from lengthy label\n"); };
+dnsname = label* end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
 
+encoded_name = dnsname;
 
-coded_name = dnsname | 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
-
-encoded_name := coded_name >{ debug(DNS_PARSE,"Encoded name, offs: %d, c: '%02x'\n", p-buf, *p); } @{ debug(DNS_PARSE,"RGL: Encoded name end\n"); fret; }; 
-
-action call_encoded_name_fhold { fhold; fcall encoded_name; }
-action call_encoded_name { fcall encoded_name; }
-
-qname = coded_name;
+qname = encoded_name >{ debug(DNS_PARSE, "RGL: Question Name\n"); };
 qtype = uint16 >{ debug(DNS_PARSE,"RGL: QType\n"); };
 qclass = uint16 >{ debug(DNS_PARSE,"RGL: QClass\n"); };
 
-aname = coded_name;
+aname = encoded_name >{ debug(DNS_PARSE, "RGL: Answer Name\n"); };
 atype = uint16;
 aclass = uint16;
 attl = uint32;
 
 
-any_dummy = any;
-question = any_dummy @call_encoded_name_fhold qtype qclass;
+question = qname qtype qclass;
 
 # only inverse queries can contain multiple questions.
 # since we ask always one question, we expect one question
@@ -102,16 +95,14 @@ questions = question;
 ipv4_addr = uint32;
 ipv6_addr = any {16};
 
+# RDATA consumer (not used now, but maybe sometime)
+
 action in_rdata { runlen-- > 0 }
-# Magic jump
 ardata = any @{ uint8_acc[0] = *p; } 
              any @{ runlen = (unsigned short)256*uint8_acc[0] + *p; }
                  (any when in_rdata)**;
 
-check_ardata := ardata @{ fret; };
-# check_ardata := any >{ debug(DNS_PARSE,"ARDATA\n"); };
 
-action call_ardata { fcall check_ardata; }
 
 cname_len = uint16;
 soa_len = uint16;
@@ -121,17 +112,22 @@ soa_retry = uint32;
 soa_expire = uint32;
 soa_minimum = uint32;
 
-rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr;
-rr_ns = 2 0 1 attl cname_len @call_encoded_name; 
 
-rr_soa = 6 0 1 soa_len @call_encoded_name @call_encoded_name 
+# Notice that RRs start not with zero - we had to leave
+# zero in the expression that calls this one - so
+# not to have any ambiguity
+
+rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr;
+rr_ns = 2 0 1 attl cname_len encoded_name; 
+
+rr_soa = 6 0 1 soa_len encoded_name encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
-rr_cname = 5 0 1 attl cname_len @call_encoded_name; 
+rr_cname = 5 0 1 attl cname_len encoded_name; 
 rr_aaaa = 0x1c 0 1 attl 0 16 @{ debug(DNS_PARSE,"Getting IPv6 addr\n"); } ipv6_addr;
 
 rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
 
-answer = any_dummy @call_encoded_name_fhold 0 rr_whatever >{ debug(DNS_PARSE,"RR type: %02x\n", *p); } ;
+answer = aname 0 rr_whatever >{ debug(DNS_PARSE,"RR type: %02x\n", *p); } ;
 
 answers = answer+ >{ debug(DNS_PARSE,"Entering answers\n"); };
 
