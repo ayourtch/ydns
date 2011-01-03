@@ -38,6 +38,8 @@ label_itself =
 
 label =  label_itself %check_label_len;
 
+labels := label* $!{fhold;fret;};
+
 action uncompress_name {
   uint16_acc = 256*uint8_acc[0] + *p;
   debug(DNS_PARSE, "FIXME: extract compressed part of name\n");
@@ -47,8 +49,7 @@ name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; }
                    any @uncompress_name;
 end_of_name = name_from_offset | 0;
 
-dnsname = any @{ fhold; runlen = -1; } 
-          label* 
+dnsname = any @{ fhold; runlen = -1; fcall labels; } 
           end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
 
 

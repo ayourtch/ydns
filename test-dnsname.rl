@@ -36,6 +36,8 @@ int parsename(unsigned char *buf, int buflen) {
   int runlen = 0xdead; // corrupt deliberately
   unsigned short uint16_acc;
   unsigned long uint32_acc;
+  int top;
+  int stack[10];
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;

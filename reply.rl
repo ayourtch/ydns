@@ -137,6 +137,8 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int runlen; /* We decrement it. So, better signed than sorry. */
   unsigned short uint16_acc;
   unsigned long uint32_acc;
+  int top;
+  int stack[10];
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
