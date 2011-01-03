@@ -131,8 +131,8 @@ answer = aname 0 rr_whatever >{ debug(DNS_PARSE,"RR type: %02x\n", *p); } ;
 
 answers = answer+ >{ debug(DNS_PARSE,"Entering answers\n"); };
 
-
-main := req_header questions @{ debug(DNS_PARSE,"time for some answers\n"); } answers @{ res = 1; };
+main := req_header questions answers >/{ res = 2; } 
+                                     @{ res = 1; };
 
 
 }%%
@@ -145,7 +145,8 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int seglen = 0;
   unsigned char uint8_acc[16];
   unsigned char *p = (void *) buf;
-  unsigned char *pe = p + buflen + 1;
+  unsigned char *pe = p + buflen;
+  unsigned char *eof = pe;
   unsigned short runlen;
   unsigned short uint16_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
