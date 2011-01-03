@@ -30,9 +30,13 @@ label =
 
 
 
-response_truncated = 0x82 | 0x83 | 0x86 | 0x87;
-response_full = 0x80 | 0x81 | 0x84 | 0x85;
-cf_byte1 = response_truncated | response_full;
+action response_is_truncated   { (*p | 0x5) == 0x87 }
+action response_is_full        { (*p | 0x5) == 0x85 }
+
+cf_byte1 = any when response_is_truncated 
+               @{ debug(DNS_PARSE, "Response is truncated\n"); } 
+         | any when response_is_full
+               @{ debug(DNS_PARSE, "Response is in full\n"); };
 
 action rc_is_no_error        { DNS_RC(*p) == 0 }
 action rc_is_format_error    { DNS_RC(*p) == 1 }
