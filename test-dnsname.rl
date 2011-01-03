@@ -2,14 +2,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define DEBUG
-#ifdef DEBUG 
-#define debug(what, ...) printf(__VA_ARGS__)
-#else
-#define debug(what, ...)
-#endif
-
-
+#include "dns.h"
 
 %%{
 
@@ -30,6 +23,8 @@ int parsename(unsigned char *buf, int buflen) {
   int seglen = 0;
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
+  unsigned char hostname_acc[HOSTNAME_SZ];
+  unsigned int acchpos;
   unsigned char *p = (void *) buf;
   unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
@@ -44,6 +39,9 @@ int parsename(unsigned char *buf, int buflen) {
   %%write exec;
   debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %d, c: 0x%02x\n",
           res, seglen, p-buf, *p);
+  if (res == 1 ) {
+    printf("Decoded hostname: '%s'\n", hostname_acc);
+  }
   return res;
 }
 

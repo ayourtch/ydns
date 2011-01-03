@@ -131,6 +131,8 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   int seglen = 0;
   unsigned char uint8_acc[16];
   unsigned int acc8pos;
+  unsigned char hostname_acc[HOSTNAME_SZ];
+  unsigned int acchpos;
   unsigned char *p = (void *) buf;
   unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
@@ -140,6 +142,7 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   unsigned long uint32_acc;
   int top;
   int stack[10];
+  
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;

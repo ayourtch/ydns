@@ -1,12 +1,27 @@
+#include "dns.h"
+
 %%{
 
 machine dns;
 
-action debug_label_s {
+action hostname_char_s {
     debug(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; } 
+    else { return 0; }
 }
-action debug_label_e {
+action hostname_char_c {
     debug(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; }
+    else { return 0; }
+}
+
+action hostname_label_end {
+  if(acchpos < HOSTNAMESZ) {
+    hostname_acc[acchpos++] = '.';
+  } else {
+    debug(LABEL_DEBUG, "Could not fit hostname while parsing\n");
+    return 0;
+  }
 }
 
 
@@ -29,10 +44,19 @@ action check_label_len {
 label_itself =
       1..63 when not_in_label 
             @{ runlen = *p-2; seglen = *p; 
+               if (acchpos > 0) {
+                 acchpos++; 
+                 /* this is not the first label, so let the dot live */ 
+               }
+               if(acchpos + *p < HOSTNAME_SZ) {
+                 hostname_acc[acchpos + *p] = '.'; 
+                 hostname_acc[acchpos + *p + 1] = 0; 
+               }
+
                debug(DNS_PARSE, "LABEL: %d\n", seglen); }
-            letter_only @debug_label_s
+            letter_only @hostname_char_s
             (
-              (dash when in_label | letter_or_digit) @debug_label_e
+              (dash when in_label | letter_or_digit) @hostname_char_c
                  @{ runlen--; } 
             )**;
 
@@ -66,7 +90,7 @@ name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; }
                    any @uncompress_name;
 end_of_name = name_from_offset | 0;
 
-dnsname = any @{ fhold; runlen = -1; fcall labels; } 
+dnsname = any @{ fhold; runlen = -1; acchpos = 0; fcall labels; } 
           end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
 
 
