@@ -15,15 +15,15 @@ for i = 1,63 do
   end 
   we_are_rfc_police = true
   if we_are_rfc_police then
-    if i == 0 then 
+    if i == 1 then 
       innards = "ll"
-    elseif i == 1 then
+    elseif i == 2 then
       innards = "ll ld"
     else
-      innards = "ll ldh{" .. i .. "} ld"
+      innards = "ll ldh {" .. (i-2) .. "} ld"
     end
   else
-    innards = "ldh{" .. i .. "}"
+    innards = "ldh {" .. i .. "}"
   end
   print("    " .. i .. " " .. innards .. 
         " @{ debug(DNS_LABEL,\"LBL"..i.."\\n\"); seglen = " .. i .. "; } " .. delim)
