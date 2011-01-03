@@ -86,17 +86,21 @@ int encode_request(unsigned char **buf, int buf_sz, int type, char *name) {
   return result;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   int sock;
   struct sockaddr_in server_addr;
   struct hostent *host;
-  char send_data[1024] = "api.twitter.com";
   unsigned char *p = buf;
   int enclen;
   int nread;
   socklen_t sockaddr_sz = sizeof(struct sockaddr);
 
-  host= (struct hostent *) gethostbyname((char *)"192.168.1.1");
+  if(argc < 4) {
+    printf("Usage: %s <recursive DNS> <type> <DNS name>\n", argv[0]);
+    exit(1);
+  }
+
+  host= (struct hostent *) gethostbyname((char *)argv[1]);
 
 
   if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -108,7 +112,7 @@ int main() {
   server_addr.sin_port = htons(53);
   server_addr.sin_addr = *((struct in_addr *)host->h_addr);
   bzero(&(server_addr.sin_zero),8);
-  if(encode_request(&p, sizeof(buf), 0x1, send_data)) {
+  if(encode_request(&p, sizeof(buf), atoi(argv[2]), argv[3])) {
         enclen = p-buf; 
         sendto(sock, buf, enclen, 0,
               (struct sockaddr *)&server_addr, sizeof(struct sockaddr));
