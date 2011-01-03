@@ -18,7 +18,19 @@ ld = [a-zA-Z0-9];
 # shorthand for any value
 x = any;
 
-include "label.rl";
+# include "label.rl";
+
+
+action in_label { runlen-- > 0 }
+
+label_itself =
+      1 @{ seglen = 1; runlen = 0; } ll |
+      2 @{ seglen = 2; runlen = 0; } ll ld |
+      3..63 @{ runlen = *p-2; seglen = *p; } ll (ldh when in_label)+ ld;
+
+label = 
+  1..63 @{ debug(LABEL_DEBUG, "LABEL: %d, ofs: %d\n", *p, p-buf); fhold; } 
+        label_itself;
 
 
 
@@ -64,7 +76,7 @@ req_header = req_id codeflags qdcount ancount nscount arcount;
 nameoffset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
 end_of_name = nameoffset|0;
 
-dnsname = label* end_of_name @{ debug(DNS_PARSE,"RGL: Exiting from lengthy label\n"); };
+dnsname = (end_of_name | label+ end_of_name) @{ debug(DNS_PARSE,"RGL: Exiting from lengthy label\n"); };
 
 
 coded_name = dnsname | 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
@@ -143,6 +155,7 @@ int parse_dns_reply(unsigned char *buf, int buflen) {
   unsigned char savebyte2;
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen + 1;
+  unsigned short runlen;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
