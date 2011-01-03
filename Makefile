@@ -1,21 +1,24 @@
-all: test-dnsname-run dnstest
+all: test-label-run test-dnsname-run dnstest
 
 dnstest: reply.c main.c
 	gcc -g -Werror -Wall -o dnstest reply.c main.c
 clean:
-	rm -f *.o dnstest reply.c test-dnsname.c test-dnsname
+	rm -f *.o dnstest reply.c 
+	rm -f test-dnsname.c test-dnsname test-label test-label.c
 
 reply.c: reply.rl  
 	ragel -e reply.rl
 
 view-label:
-	ragel -V view-label.rl | dotty -
+	ragel -e -p -V view-label.rl | dotty -
 
-test-dnsname.c: test-dnsname.rl dnsname.rl
+test-dnsname-run: test-dnsname.rl dnsname.rl
 	ragel test-dnsname.rl
-
-test-dnsname-run: test-dnsname.c
 	gcc -o test-dnsname test-dnsname.c
 	./test-dnsname
 
+test-label-run: test-label.rl dnsname.rl
+	ragel test-label.rl
+	gcc -o test-label test-label.c
+	./test-label
 
