@@ -143,8 +143,6 @@ main := req_header questions @{ debug(DNS_PARSE,"time for some answers\n"); } an
 int parse_dns_reply(unsigned char *buf, int buflen) {
   int cs, res = 0;
   int seglen = 0;
-  int top = 20;
-  int stack[100];
   unsigned char uint8_acc[16];
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen + 1;
