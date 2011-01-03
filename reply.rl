@@ -9,24 +9,20 @@ alphtype unsigned char;
 
 # The original DNS name types
 # Starts only with a letter
-ll = [a-zA-Z];
+letter_only = [a-zA-Z];
 # Then can have maybe some letters numbers and dashes
-ldh = [a-zA-Z0-9] | '-';
+letter_digit_dash = [a-zA-Z0-9] | '-';
 # and ends with a letter or digit
-ld = [a-zA-Z0-9];
-
-# shorthand for any value
-x = any;
-
-# include "label.rl";
+letter_or_digit = [a-zA-Z0-9];
 
 
 action in_label { runlen-- > 0 }
 
 label_itself =
-      1 @{ seglen = 1; runlen = 0; } ll |
-      2 @{ seglen = 2; runlen = 0; } ll ld |
-      3..63 @{ runlen = *p-2; seglen = *p; } ll (ldh when in_label)+ ld;
+      1 @{ seglen = 1; runlen = 0; } letter_only |
+      2 @{ seglen = 2; runlen = 0; } letter_only letter_or_digit |
+      3..63 @{ runlen = *p-2; seglen = *p; } 
+            letter_only (letter_digit_dash when in_label)+ letter_or_digit;
 
 label = 
   1..63 @{ debug(LABEL_DEBUG, "LABEL: %d, ofs: %d\n", *p, p-buf); fhold; } 
@@ -71,12 +67,7 @@ arcount = uint16 >{ debug(DNS_PARSE,"RGL: AR count\n"); };
 
 req_header = req_id codeflags qdcount ancount nscount arcount;
 
-# rr = name type(int16) class(int16) ttl(int32) rdlen(int16) rdata(var)
-
-# main := req_header name_segment @{ res = 1; };
-
 # fixme: EDNS0 will be here. Maybe.
-
 nameoffset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
 end_of_name = nameoffset|0;
 
