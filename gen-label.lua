@@ -12,7 +12,7 @@ for i = 1,63 do
   if (i == 63) then
     delim = ";"
   end 
-
+  we_are_rfc_police = true
   if we_are_rfc_police then
     if i == 0 then 
       table.insert(acc, "ll")
