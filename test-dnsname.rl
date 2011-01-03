@@ -33,7 +33,7 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
-  long runlen;
+  long runlen = 0xdead; // corrupt deliberately
   unsigned short uint16_acc;
   unsigned long uint32_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);

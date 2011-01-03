@@ -6,7 +6,7 @@ clean:
 	rm -f *.o dnstest reply.c 
 	rm -f test-dnsname.c test-dnsname test-label test-label.c
 
-reply.c: reply.rl  
+reply.c: reply.rl dnsname.rl
 	ragel -e reply.rl
 
 view-label:

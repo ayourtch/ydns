@@ -33,7 +33,9 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned char *p = (void *) buf;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
-  long runlen;
+  /* runlen gets reset to -1 at the start of domainname, 
+     which we do not do here */
+  long runlen = -1;
   unsigned short uint16_acc;
   unsigned long uint32_acc;
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
