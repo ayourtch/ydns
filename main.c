@@ -90,7 +90,7 @@ int main() {
   int sock;
   struct sockaddr_in server_addr;
   struct hostent *host;
-  char send_data[1024] = "www.google.com";
+  char send_data[1024] = "api.twitter.com";
   char *p = buf;
   int enclen;
   int nread;
@@ -108,7 +108,7 @@ int main() {
   server_addr.sin_port = htons(53);
   server_addr.sin_addr = *((struct in_addr *)host->h_addr);
   bzero(&(server_addr.sin_zero),8);
-  if(encode_request(&p, sizeof(buf), 1, send_data)) {
+  if(encode_request(&p, sizeof(buf), 0x1c, send_data)) {
         printf("Name encoded ok!\n");
         enclen = p-buf; 
         sendto(sock, buf, enclen, 0,
