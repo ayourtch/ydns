@@ -42,7 +42,8 @@ labels := label* $!{fhold;fret;};
 
 u_labels := 1..63 @{ fhold; } 
             label* $!{fhold; 
-                      printf("Returning from %d to %d\n", p-buf, sav_p-buf); 
+                      debug(DNS_PARSE, "Returning from %d to %d\n", 
+                            p-buf, sav_p-buf); 
                       p = sav_p; 
                       fret;};
 
