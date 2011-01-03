@@ -5,9 +5,6 @@ machine dns;
 action debug_label_s {
     debug(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
 }
-action debug_label_m {
-    debug(LABEL_DEBUG, "letter(m): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
-}
 action debug_label_e {
     debug(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
 }
