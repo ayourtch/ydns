@@ -30,14 +30,15 @@ action check_label_len {
 }
 
 label_itself =
-      1..63 @{ runlen = *p-2; seglen = *p; }
+      1..63 @{ runlen = *p-2; seglen = *p; 
+                  debug(DNS_PARSE, "LABEL: %d\n", *p); }
             letter_only @debug_label_s
             (
               (dash when in_label | letter_or_digit) %debug_label_e
                  @{ runlen--; } 
             )**;
 
-label = label_itself %check_label_len;
+label = label_itself @check_label_len;
 
 name_from_offset = 0xc0 .. 0xff any @{ debug(DNS_PARSE,"Name from offset\n"); };
 end_of_name = name_from_offset | 0;
