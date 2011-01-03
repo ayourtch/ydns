@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include "dns.h"
 
-#define debug printf
 
 char buf[32768];
 
@@ -32,12 +32,12 @@ int store_str(char **pp, char *pe, char *str) {
   while(*pc && (*pp < pe)) {
     /* find the length of the next name segment */
     for(len=0, pce=pc; ((len < 64) && (*pce) && (*pce != '.')); pce++, len++);
-    printf("Seg len: %d (len: %d)\n", pce-pc, len);
+    debug(STORE_STR, "Seg len: %d (len: %d)\n", pce-pc, len);
     if(len > 63) { return 0; }
     /* try to store this name segment to target buffer */
     if(store_8(pp, pe, (uint8_t) len)) {
       while(pce != pc) {
-        printf("storing '%c'\n", *pc);
+        debug(STORE_STR, "storing '%c'\n", *pc);
         if(!store_8(pp, pe, *pc++)) { return 0; };
       }
     }
@@ -108,8 +108,7 @@ int main() {
   server_addr.sin_port = htons(53);
   server_addr.sin_addr = *((struct in_addr *)host->h_addr);
   bzero(&(server_addr.sin_zero),8);
-  if(encode_request(&p, sizeof(buf), 0x1c, send_data)) {
-        printf("Name encoded ok!\n");
+  if(encode_request(&p, sizeof(buf), 0x1, send_data)) {
         enclen = p-buf; 
         sendto(sock, buf, enclen, 0,
               (struct sockaddr *)&server_addr, sizeof(struct sockaddr));
@@ -117,8 +116,9 @@ int main() {
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
-        parse_dns_reply(buf, nread);
-
+        printf("Parse result: %d\n", parse_dns_reply(buf, nread));
+  } else {
+        printf("Could not encode name!\n");
   }
 }
 

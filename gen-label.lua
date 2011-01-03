@@ -25,7 +25,7 @@ for i = 1,63 do
     table.insert(acc, "ldh")
   end
   print("    " .. i .. " " .. table.concat(acc, " ") .. 
-        " @{ printf(\"LBL"..i.."\\n\"); seglen = " .. i .. "; } " .. delim)
+        " @{ debug(DNS_LABEL,\"LBL"..i.."\\n\"); seglen = " .. i .. "; } " .. delim)
 end
 
 print([[
