@@ -5,25 +5,15 @@
 machine dns;
 
 action hostname_char_s {
-    debug(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    // debug(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; } 
     else { return 0; }
 }
 action hostname_char_c {
-    debug(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    // debug(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; }
     else { return 0; }
 }
-
-action hostname_label_end {
-  if(acchpos < HOSTNAMESZ) {
-    hostname_acc[acchpos++] = '.';
-  } else {
-    debug(LABEL_DEBUG, "Could not fit hostname while parsing\n");
-    return 0;
-  }
-}
-
 
 letter_only = [a-zA-Z];
 # Then can have maybe some letters numbers and dashes
@@ -45,15 +35,15 @@ label_itself =
       1..63 when not_in_label 
             @{ runlen = *p-2; seglen = *p; 
                if (acchpos > 0) {
-                 acchpos++; 
+                 hostname_acc[acchpos++] = '.'; 
                  /* this is not the first label, so let the dot live */ 
                }
                if(acchpos + *p < HOSTNAME_SZ) {
-                 hostname_acc[acchpos + *p] = '.'; 
-                 hostname_acc[acchpos + *p + 1] = 0; 
+                 hostname_acc[acchpos + *p] = 0; 
                }
 
-               debug(DNS_PARSE, "LABEL: %d\n", seglen); }
+               // debug(DNS_PARSE, "LABEL: %d\n", seglen); 
+            }
             letter_only @hostname_char_s
             (
               (dash when in_label | letter_or_digit) @hostname_char_c
@@ -73,7 +63,6 @@ u_labels := 1..63 @{ fhold; }
 
 action uncompress_name {
   uint16_acc = 256*uint8_acc[0] + *p;
-  debug(DNS_PARSE, "FIXME: extract compressed part of name\n");
   sav_p = p;
   if (p-buf > uint16_acc) {
     p = buf + uint16_acc -1;
