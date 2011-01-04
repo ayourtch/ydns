@@ -7,10 +7,18 @@ int parse_dns_reply(unsigned char *buf, int buflen);
 #define HOSTNAME_SZ 256
 
 #define DEBUG
+#define DEBUGX
+
 #ifdef DEBUG 
 #define debug(what, ...) printf(__VA_ARGS__)
 #else
 #define debug(what, ...)
+#endif
+
+#ifdef DEBUGX 
+#define debugx(what, ...) printf(__VA_ARGS__)
+#else
+#define debugx(what, ...)
 #endif
 
 #define DNS_RC(x) ((x) & 0x0f)

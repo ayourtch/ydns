@@ -5,12 +5,12 @@
 machine dns;
 
 action hostname_char_s {
-    // debug(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    debugx(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d, pos: %d\n", *p, *p, runlen, p-buf);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; } 
     else { return 0; }
 }
 action hostname_char_c {
-    // debug(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d\n", *p, *p, runlen);
+    debugx(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d, pos: %d\n", *p, *p, runlen, p-buf);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; }
     else { return 0; }
 }
@@ -48,7 +48,7 @@ action label_start {
       debug(DNS_PARSE, "Hostname too long");
       return 0;
     }
-    // debug(DNS_PARSE, "LABEL: %d\n", seglen); 
+    debugx(DNS_PARSE, "LABEL: %d\n", seglen); 
 }
 
 label_itself =
@@ -63,9 +63,9 @@ label =  label_itself %check_label_len;
 
 labels := label* $!{fhold;fret;};
 
-u_labels := 1..63 @{ fhold; } 
-            label* $!{fhold; 
-                      debug(DNS_PARSE, "Returning from %d to %d\n", 
+u_labels := 1..63 @{ fhold; if(acchpos > 0) { acchpos--; } } 
+            label+ $!{fhold; 
+                      debugx(DNS_PARSE, "Returning from %d to %d\n", 
                             p-buf, sav_p-buf); 
                       p = sav_p; 
                       fret;};
@@ -75,7 +75,7 @@ action uncompress_name {
   sav_p = p;
   if (p-buf > uint16_acc) {
     p = buf + uint16_acc -1;
-    debug(DNS_PARSE, "Jump p from %d to %d (content: 0x%02x)\n", 
+    debugx(DNS_PARSE, "Jump p from %d to %d (content: 0x%02x)\n", 
           sav_p - buf, p-buf, *p);
     fcall u_labels;
   } else {
