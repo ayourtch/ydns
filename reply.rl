@@ -93,6 +93,7 @@ ardata = any @{ uint8_acc[0] = *p; }
 
 
 cname_len = uint16;
+ns_len = uint16;
 soa_len = uint16;
 soa_serial = uint32;
 soa_refresh = uint32;
@@ -106,11 +107,12 @@ soa_minimum = uint32;
 # not to have any ambiguity
 
 rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr %{ cb->process_a_rr(arg, (void *)hostname_acc, uint32_attl, uint32_acc); };
-rr_ns = 2 0 1 attl cname_len encoded_name; 
+rr_ns = 2 0 1 attl cname_len encoded_name;
 
 rr_soa = 6 0 1 attl soa_len encoded_name encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
-rr_cname = 5 0 1 attl cname_len encoded_name @{ debug(DNS_PARSE, "CNAME: %s\n", hostname_acc); }; 
+rr_cname = 5 0 1 attl @{ memcpy(host_cname_acc, hostname_acc, sizeof(host_cname_acc)); } cname_len encoded_name %{ cb -> process_cname_rr(arg, (void*)host_cname_acc, uint32_attl, (void *) hostname_acc); }; 
+
 rr_aaaa = 0x1c 0 1 attl 0 16 ipv6_addr %{ cb->process_aaaa_rr(arg, (void *)hostname_acc, uint32_attl, uint8_acc); };
 
 rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
@@ -137,6 +139,7 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   unsigned int acc8pos;
   unsigned char hostname_acc[HOSTNAME_SZ];
   unsigned int acchpos;
+  unsigned char host_cname_acc[HOSTNAME_SZ];
   unsigned char *p = (void *) buf;
   unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
