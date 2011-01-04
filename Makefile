@@ -14,7 +14,7 @@ view-label:
 
 test-dnsname-run: test-dnsname.rl dnsname.rl
 	ragel test-dnsname.rl
-	gcc -o test-dnsname test-dnsname.c
+	gcc -g -o test-dnsname test-dnsname.c
 	./test-dnsname
 
 test-label-run: test-label.rl dnsname.rl

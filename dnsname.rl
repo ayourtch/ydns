@@ -3,6 +3,8 @@
 %%{
 
 machine dns;
+alphtype unsigned char;
+
 
 action hostname_char_s {
     debugx(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d, pos: %d\n", *p, *p, runlen, p-buf);
@@ -39,6 +41,7 @@ action label_start {
       return 0;
     }
     if (acchpos > 0) {
+      printf("Put a DOT\n");
       hostname_acc[acchpos++] = '.'; 
       /* this is not the first label, so put the dot inbetween. */ 
     }
@@ -63,8 +66,19 @@ label =  label_itself %check_label_len;
 
 labels := label* $!{fhold;fret;};
 
-u_labels := 1..63 @{ fhold; if(acchpos > 0) { acchpos--; } } 
-            label+ $!{fhold; 
+compressed_label = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; } . any;  
+
+u_labels := 1..63 @{ fhold; } .
+            (label+ .
+            compressed_label? @{ 
+                        uint16_acc = 256*uint8_acc[0] + *p;
+                        debugx(DNS_PARSE, "Second Jump p from %d to %d (content: 0x%02x)\n", 
+                        p - buf, uint16_acc, *p);
+                        p = buf + uint16_acc -1;
+                        fgoto u_labels;
+                    })
+
+                    $!{fhold; 
                       debugx(DNS_PARSE, "Returning from %d to %d\n", 
                             p-buf, sav_p-buf); 
                       p = sav_p; 
@@ -84,11 +98,11 @@ action uncompress_name {
   }
 }
 
-name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; }
+name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; } .
                    any @uncompress_name;
 end_of_name = name_from_offset | 0;
 
-dnsname = any @{ fhold; runlen = -1; acchpos = 0; fcall labels; } 
+dnsname = any @{ fhold; runlen = -1; acchpos = 0; fcall labels; } .
           end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
 
 
