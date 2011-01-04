@@ -10,7 +10,8 @@ machine dns;
 
 include "dnsname.rl";
 
-main := dnsname @{ printf("HAPPY END!\n"); res = 1; };
+main := dnsname %/{ printf("HAPPY EOF\n"); res = 1; } 
+                @{ printf("HAPPY END!\n"); res = 1; };
 
 }%%
 
@@ -60,14 +61,14 @@ int main(int argc, char *argv[]) {
   assert(!TEST("\0225afebrowsingcache-\006google\003com"));
   assert(!TEST("\0225afebrowingcache-\006google\003com"));
   printf("================== All simple tests passed.==============\n");
-#define S "\003x01\006domain\003com\000\x01X\x02YY\300\000+\000"
-  assert(TEST2(21, 24, S));
-#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000+\000"
-  assert(TEST2(21, 26, S));
+#define S "\003x01\006domain\003com\000\x01X\x02YY\300\000"
+  assert(TEST2(21, 23, S));
+#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000"
+  assert(TEST2(21, 25, S));
 #define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025+\000"
-  assert(TEST2(25, 30, S));
-#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025\001C\300\031+\000"
-  assert(TEST2(29, 34, S));
+  assert(TEST2(25, 29, S));
+#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025\001C\300\031"
+  assert(TEST2(29, 33, S));
   printf("=========================\n");
   exit(0);
 }
