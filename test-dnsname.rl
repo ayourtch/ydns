@@ -16,9 +16,10 @@ main := dnsname @{ printf("HAPPY END!\n"); res = 1; };
 
 %%write data;
 
-#define TEST(name) parsename(name, strlen(name)+1)
+#define TEST(name) parsename(name, strlen(name)+1, 0)
+#define TEST2(ofs, name) parsename(name, sizeof(name) + 1, sizeof(name)-ofs)
 
-int parsename(unsigned char *buf, int buflen) {
+int parsename(unsigned char *buf, int buflen, int startpos) {
   int cs, res = 0;
   int seglen = 0;
   unsigned char uint8_acc[16];
@@ -34,7 +35,10 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned long uint32_acc;
   int top;
   int stack[10];
+  acchpos = 0;
+  memset(hostname_acc, 0, sizeof(hostname_acc));
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
+  p += startpos; 
   %%write init;
   %%write exec;
   debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %d, c: 0x%02x\n",
@@ -55,6 +59,9 @@ int main(int argc, char *argv[]) {
   assert(!TEST("\022safebrowsingcache-\006google\003com"));
   assert(!TEST("\0225afebrowsingcache-\006google\003com"));
   assert(!TEST("\0225afebrowingcache-\006google\003com"));
-  printf("All tests passed.\n");
+  printf("================== All simple tests passed.==============\n");
+  
+  assert(TEST2(5, "\x03x01\x06domain\x03com\x00\x01X\xc0\x00"));
+  assert(TEST2(3, "\x03x01\x06domain\x03com\x00\xc0\x00"));
   exit(0);
 }
