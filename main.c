@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
-        printf("Parse result: %d\n", parse_dns_reply(buf, nread));
+        printf("Parse result: %d\n", ydns_decode_reply(buf, nread, NULL));
   } else {
         printf("Could not encode name!\n");
   }

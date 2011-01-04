@@ -129,7 +129,7 @@ main := req_header questions answers >/{ res = 2; }
 
 %%write data;
 
-int parse_dns_reply(unsigned char *buf, int buflen) {
+int ydns_decode_reply(unsigned char *buf, int buflen, decode_callbacks_t *cb) {
   int cs, res = 0;
   int seglen = 0;
   unsigned char uint8_acc[16];
