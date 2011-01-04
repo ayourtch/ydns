@@ -39,10 +39,10 @@ uint16 = any @{ uint8_acc[0] = *p; }
                     uint16_acc = (unsigned short)256*uint8_acc[0] + 
                                                  uint8_acc[1]; 
                   };
-uint32 = any @{ uint8_acc[0] = *p; }
-             any @{ uint8_acc[1] = *p; }
-                 any @{ uint8_acc[2] = *p; }
-                    any @{ uint8_acc[3] = *p;
+uint32 = any @{ uint8_acc[3] = *p; }
+             any @{ uint8_acc[2] = *p; }
+                 any @{ uint8_acc[1] = *p; }
+                    any @{ uint8_acc[0] = *p;
                            uint32_acc = (unsigned long)uint8_acc[3] + 
                                         256*(uint8_acc[2] +
                                          256*(uint8_acc[1] +
