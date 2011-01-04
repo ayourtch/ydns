@@ -25,13 +25,13 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   return 1;
 }
 static int my_a_rr(void *arg, char *domainname, uint32_t ttl, uint32_t addr) {
-  char dest[17];
+  char dest[INET_ADDRSTRLEN+1] = { 0 };
   inet_ntop(AF_INET, &addr, dest, sizeof(dest));
   printf("RR A: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
   return 1;
 }
 static int my_aaaa_rr(void *arg, char *domainname, uint32_t ttl, uint8_t *addr) {
-  char dest[17];
+  char dest[INET6_ADDRSTRLEN+1] = { 0 };
   inet_ntop(AF_INET6, addr, dest, sizeof(dest));
   printf("RR AAAA: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
   return 1;

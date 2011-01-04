@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include "dns.h"
 
 %%{
@@ -34,14 +35,14 @@ cf_byte2 = any when rc_is_no_error |
  
 codeflags = cf_byte1 cf_byte2;
 
-uint16 = any @{ uint8_acc[0] = *p; } 
+uint16 = any @{ uint8_acc[0] = *p; } .
              any @{ uint8_acc[1] = *p;
                     uint16_acc = (unsigned short)256*uint8_acc[0] + 
                                                  uint8_acc[1]; 
                   };
-uint32 = any @{ uint8_acc[3] = *p; }
-             any @{ uint8_acc[2] = *p; }
-                 any @{ uint8_acc[1] = *p; }
+uint32 = any @{ uint8_acc[3] = *p; } .
+             any @{ uint8_acc[2] = *p; } .
+                 any @{ uint8_acc[1] = *p; } .
                     any @{ uint8_acc[0] = *p;
                            uint32_acc = (unsigned long)uint8_acc[3] + 
                                         256*(uint8_acc[2] +
@@ -68,7 +69,7 @@ qclass = uint16 @{ debug(DNS_PARSE,"RGL: QClass %d\n", uint16_acc); };
 aname = encoded_name @{ debug(DNS_PARSE, "RGL: Answer Name: '%s'\n", hostname_acc); };
 atype = uint16;
 aclass = uint16;
-attl = uint32;
+attl = uint32 %{ uint32_attl = ntohl(uint32_acc); };
 
 
 question = qname qtype qclass;
@@ -79,7 +80,7 @@ question = qname qtype qclass;
 questions = question;
 
 ipv4_addr = uint32;
-ipv6_addr = any @{ acc8pos = 0; uint8_acc[0] = *p; }
+ipv6_addr = any @{ acc8pos = 0; uint8_acc[acc8pos++] = *p; }
             (any @{ uint8_acc[acc8pos++] = *p; }) {15};
 
 # RDATA consumer (not used now, but maybe sometime)
@@ -104,13 +105,13 @@ soa_minimum = uint32;
 # zero in the expression that calls this one - so
 # not to have any ambiguity
 
-rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr %{ cb->process_a_rr(arg, (void *)hostname_acc, uint16_acc, uint32_acc); };
+rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr %{ cb->process_a_rr(arg, (void *)hostname_acc, uint32_attl, uint32_acc); };
 rr_ns = 2 0 1 attl cname_len encoded_name; 
 
 rr_soa = 6 0 1 attl soa_len encoded_name encoded_name 
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
 rr_cname = 5 0 1 attl cname_len encoded_name @{ debug(DNS_PARSE, "CNAME: %s\n", hostname_acc); }; 
-rr_aaaa = 0x1c 0 1 attl 0 16 @{ debug(DNS_PARSE,"Getting IPv6 addr\n"); } ipv6_addr;
+rr_aaaa = 0x1c 0 1 attl 0 16 ipv6_addr %{ cb->process_aaaa_rr(arg, (void *)hostname_acc, uint32_attl, uint8_acc); };
 
 rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
 
@@ -143,6 +144,7 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   int runlen; /* We decrement it. So, better signed than sorry. */
   unsigned short uint16_acc;
   unsigned long uint32_acc;
+  unsigned long uint32_attl;
   int top;
   int stack[10];
   
