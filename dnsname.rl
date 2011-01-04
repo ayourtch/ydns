@@ -41,7 +41,6 @@ action label_start {
       return 0;
     }
     if (acchpos > 0) {
-      printf("Put a DOT\n");
       hostname_acc[acchpos++] = '.'; 
       /* this is not the first label, so put the dot inbetween. */ 
     }
