@@ -1,3 +1,6 @@
+
+#include <stdint.h>
+
 void lookup_name(int sock, char *name);
 int parse_dns_reply(unsigned char *buf, int buflen);
 
@@ -11,3 +14,6 @@ int parse_dns_reply(unsigned char *buf, int buflen);
 #endif
 
 #define DNS_RC(x) ((x) & 0x0f)
+
+int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, uint16_t id);
+
