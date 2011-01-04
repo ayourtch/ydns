@@ -104,7 +104,7 @@ soa_minimum = uint32;
 # zero in the expression that calls this one - so
 # not to have any ambiguity
 
-rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr;
+rr_a = 1 0 1 attl 0 4 @{ debug(DNS_PARSE,"Getting IPv4 addr\n"); } ipv4_addr %{ cb->process_a_rr(arg, (void *)hostname_acc, uint16_acc, uint32_acc); };
 rr_ns = 2 0 1 attl cname_len encoded_name; 
 
 rr_soa = 6 0 1 attl soa_len encoded_name encoded_name 
@@ -129,7 +129,7 @@ main := req_header questions answers >/{ res = 2; }
 
 %%write data;
 
-int ydns_decode_reply(unsigned char *buf, int buflen, decode_callbacks_t *cb) {
+int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callbacks_t *cb) {
   int cs, res = 0;
   int seglen = 0;
   unsigned char uint8_acc[16];

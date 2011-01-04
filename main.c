@@ -12,6 +12,46 @@
 
 unsigned char buf[1500];
 
+
+
+
+static int my_header(void *arg, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
+  printf("Header: trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n", 
+          trunc, errcode, qdcount, ancount, nscount, arcount);
+  return 1;
+}
+static int my_question(void *arg, char *domainname, int type, int class) {
+  printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
+  return 1;
+}
+static int my_a_rr(void *arg, char *domainname, uint32_t ttl, uint32_t addr) {
+  char dest[17];
+  inet_ntop(AF_INET, &addr, dest, sizeof(dest));
+  printf("RR A: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
+  return 1;
+}
+static int my_aaaa_rr(void *arg, char *domainname, uint32_t ttl, uint8_t *addr) {
+  char dest[17];
+  inet_ntop(AF_INET6, addr, dest, sizeof(dest));
+  printf("RR AAAA: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
+  return 1;
+}
+static int my_cname_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
+  printf("RR CNAME: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
+  return 1;
+}
+
+
+decode_callbacks_t my_cb = {
+  .process_header = my_header,
+  .process_question = my_question,
+  .process_a_rr = my_a_rr,
+  .process_aaaa_rr = my_aaaa_rr,
+  .process_cname_rr = my_cname_rr,
+};
+
+
+
 int main(int argc, char *argv[]) {
   int sock;
   struct sockaddr_in server_addr;
@@ -46,7 +86,7 @@ int main(int argc, char *argv[]) {
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
-        printf("Parse result: %d\n", ydns_decode_reply(buf, nread, NULL));
+        printf("Parse result: %d\n", ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb));
   } else {
         printf("Could not encode name!\n");
   }

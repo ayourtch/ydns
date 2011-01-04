@@ -20,7 +20,7 @@ int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, u
 /*
  * Called when the header is parsed. Return false, and the processing will stop right there
  */
-typedef int ((*ydns_header_func_t)(void *arg, int qdcount, int ancount, int nscount, int arcount));
+typedef int ((*ydns_header_func_t)(void *arg, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount));
 
 /*
  * We parsed one question and want to let you know about it. Don't hang on to domainname - it's
@@ -48,6 +48,6 @@ typedef struct decode_callbacks_t {
 } decode_callbacks_t;
 
 
-int ydns_decode_reply(unsigned char *buf, int buflen, decode_callbacks_t *cb);
+int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callbacks_t *cb);
 
 
