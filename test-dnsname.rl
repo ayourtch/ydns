@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
   assert(!TEST("\0225afebrowingcache-\006google\003com"));
   printf("================== All simple tests passed.==============\n");
   
+  assert(TEST2(8, "\x03x01\x06domain\x03com\x00\x01X\x02YY\xc0\x00"));
   assert(TEST2(5, "\x03x01\x06domain\x03com\x00\x01X\xc0\x00"));
   assert(TEST2(3, "\x03x01\x06domain\x03com\x00\xc0\x00"));
   exit(0);
