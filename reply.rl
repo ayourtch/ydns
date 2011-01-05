@@ -144,6 +144,8 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   unsigned char *sav_p; 
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
+  int max_label_indirection = 10;
+  int label_indirection;
   int runlen; /* We decrement it. So, better signed than sorry. */
   unsigned short uint16_acc;
   unsigned long uint32_acc;

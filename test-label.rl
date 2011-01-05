@@ -29,6 +29,8 @@ int parsename(unsigned char *buf, int buflen) {
   unsigned char *sav_p;
   unsigned char *pe = p + buflen;
   unsigned char *eof = pe;
+  int max_label_indirection = 10;
+  int label_indirection;
   /* runlen gets reset to -1 at the start of domainname, 
      which we do not do here */
   int runlen = -1;

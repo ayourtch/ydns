@@ -34,6 +34,8 @@ int parsename(unsigned char *buf, int buflen, int startpos) {
   int runlen = 0xdead; // corrupt deliberately
   unsigned short uint16_acc;
   unsigned long uint32_acc;
+  int max_label_indirection = 10;
+  int label_indirection;
   int top;
   int stack[10];
   acchpos = 0;
@@ -69,6 +71,17 @@ int main(int argc, char *argv[]) {
   assert(TEST2(25, 29, S));
 #define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025\001C\300\031"
   assert(TEST2(29, 33, S));
+#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025\001C\300\031" \
+          "\001D\300\035" "\001E\300\041" "\001F\300\045" "\001G\300\051" \
+          "\001D\300\055" "\001E\300\061" "\001F\300\065" "\001x\300\071" 
+  assert(TEST2(29 + 8*4, 33 + 8*4, S));
+  // Negative test with too much indirection
+#define S "\003x01\006domain\003com\000\x01X\x02YY\001A\300\000\001B\300\025\001C\300\031" \
+          "\001D\300\035" "\001E\300\041" "\001F\300\045" "\001G\300\051" \
+          "\001D\300\055" "\001E\300\061" "\001F\300\065" "\001G\300\071" \
+          "\001D\300\075" "\001E\300\101" "\001F\300\105" "\001G\300\111" \
+          "\001D\300\115" "\001E\300\121" "\001F\300\125" "\001e\300\131" 
+  assert(!TEST2(29 + 16*4, 33 + 16*4, S));
   printf("=========================\n");
   exit(0);
 }

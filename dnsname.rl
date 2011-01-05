@@ -74,6 +74,10 @@ u_labels := 1..63 @{ fhold; } .
                         debugx(DNS_PARSE, "Second Jump p from %d to %d (content: 0x%02x)\n", 
                         p - buf, uint16_acc, *p);
                         p = buf + uint16_acc -1;
+			if(++label_indirection > max_label_indirection) {
+                          debugx(DNS_PARSE, "Too much of indirection while unpacking label\n");
+                          return 0;
+                        }
                         fgoto u_labels;
                     })
 
@@ -101,7 +105,7 @@ name_from_offset = 0xc0 .. 0xff @{ uint8_acc[0] = *p & 0x3f; } .
                    any @uncompress_name;
 end_of_name = name_from_offset | 0;
 
-dnsname = any @{ fhold; runlen = -1; acchpos = 0; fcall labels; } .
+dnsname = any @{ fhold; runlen = -1; acchpos = 0; label_indirection = 0; fcall labels; } .
           end_of_name @{ debug(DNS_PARSE,"RGL: Exiting dnsname\n"); };
 
 
