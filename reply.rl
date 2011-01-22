@@ -63,8 +63,8 @@ include "dnsname.rl";
 encoded_name = dnsname;
 
 qname = encoded_name @{ debug(DNS_PARSE, "RGL: Question Name: '%s'\n", hostname_acc); };
-qtype = uint16 @{ debug(DNS_PARSE,"RGL: QType %d\n", uint16_acc); };
-qclass = uint16 @{ debug(DNS_PARSE,"RGL: QClass %d\n", uint16_acc); };
+qtype = uint16 @{ debug(DNS_PARSE,"RGL: QType %d\n", uint16_acc); qtype_acc = uint16_acc; };
+qclass = uint16 @{ debug(DNS_PARSE,"RGL: QClass %d\n", uint16_acc); qclass_acc = uint16_acc; };
 
 aname = encoded_name @{ debug(DNS_PARSE, "RGL: Answer Name: '%s'\n", hostname_acc); };
 atype = uint16;
@@ -72,7 +72,7 @@ aclass = uint16;
 attl = uint32 %{ uint32_attl = ntohl(uint32_acc); };
 
 
-question = qname qtype qclass;
+question = qname qtype qclass @{ cb->process_question(arg, (void*)hostname_acc, qtype_acc, qclass_acc); };
 
 # only inverse queries can contain multiple questions.
 # since we ask always one question, we expect one question
@@ -153,6 +153,7 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   unsigned long uint32_attl;
   int xid_acc;
   int qdcount_acc, ancount_acc, nscount_acc, arcount_acc, trunc_acc, errcode_acc;
+  int qtype_acc, qclass_acc;
   int top;
   int stack[10];
   
