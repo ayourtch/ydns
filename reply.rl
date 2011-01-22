@@ -13,9 +13,9 @@ action response_is_truncated   { (*p | 0x5) == 0x87 }
 action response_is_full        { (*p | 0x5) == 0x85 }
 
 cf_byte1 = any when response_is_truncated 
-               @{ debug(DNS_PARSE, "Response is truncated\n"); } 
+               @{ debug(DNS_PARSE, "Response is truncated\n"); trunc_acc = 1; } 
          | any when response_is_full
-               @{ debug(DNS_PARSE, "Response is in full\n"); };
+               @{ debug(DNS_PARSE, "Response is in full\n"); trunc_acc = 0; };
 
 action rc_is_no_error        { DNS_RC(*p) == 0 }
 action rc_is_format_error    { DNS_RC(*p) == 1 }
@@ -49,13 +49,13 @@ uint32 = any @{ uint8_acc[3] = *p; } .
                                          256*(uint8_acc[1] +
                                           256*uint8_acc[0])); };
 
-req_id = uint16 >{ debug(DNS_PARSE,"RGL: Request id\n"); };
-qdcount = uint16 @{ debug(DNS_PARSE,"RGL: Question count: %d\n", uint16_acc); };
-ancount = uint16 @{ debug(DNS_PARSE,"RGL: Answer count: %d\n", uint16_acc); };
-nscount = uint16 @{ debug(DNS_PARSE,"RGL: NS count: %d\n", uint16_acc); };
-arcount = uint16 @{ debug(DNS_PARSE,"RGL: AR count: %d\n", uint16_acc); };
+xid = uint16 >{ debug(DNS_PARSE,"RGL: Request id\n"); };
+qdcount = uint16 @{ debug(DNS_PARSE,"RGL: Question count: %d\n", uint16_acc); qdcount_acc = uint16_acc; };
+ancount = uint16 @{ debug(DNS_PARSE,"RGL: Answer count: %d\n", uint16_acc); ancount_acc = uint16_acc; };
+nscount = uint16 @{ debug(DNS_PARSE,"RGL: NS count: %d\n", uint16_acc); nscount_acc = uint16_acc; };
+arcount = uint16 @{ debug(DNS_PARSE,"RGL: AR count: %d\n", uint16_acc); arcount_acc = uint16_acc; };
 
-req_header = req_id codeflags qdcount ancount nscount arcount;
+req_header = xid @{ xid_acc = uint16_acc; } codeflags @{ errcode_acc = DNS_RC(*p); } qdcount ancount nscount arcount;
 
 # That beast is tricky.
 include "dnsname.rl";
@@ -123,7 +123,8 @@ answer = aname
 
 answers = answer+ >{ debug(DNS_PARSE,"Entering answers\n"); };
 
-main := req_header questions answers >/{ res = 2; } 
+main := req_header @{ cb->process_header(arg, xid_acc, trunc_acc, errcode_acc, qdcount_acc, ancount_acc, nscount_acc, arcount_acc); } 
+                                     questions answers >/{ res = 2; } 
                                      @{ res = 1; };
 
 
@@ -150,6 +151,8 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   unsigned short uint16_acc;
   unsigned long uint32_acc;
   unsigned long uint32_attl;
+  int xid_acc;
+  int qdcount_acc, ancount_acc, nscount_acc, arcount_acc, trunc_acc, errcode_acc;
   int top;
   int stack[10];
   
