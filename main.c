@@ -40,6 +40,10 @@ static int my_cname_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   printf("RR CNAME: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
   return 1;
 }
+static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
+  printf("RR PTR: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
+  return 1;
+}
 
 
 decode_callbacks_t my_cb = {
@@ -48,6 +52,7 @@ decode_callbacks_t my_cb = {
   .process_a_rr = my_a_rr,
   .process_aaaa_rr = my_aaaa_rr,
   .process_cname_rr = my_cname_rr,
+  .process_ptr_rr = my_ptr_rr,
 };
 
 

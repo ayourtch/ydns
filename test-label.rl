@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
   assert(TEST("\022safebrowsing-cache"));
   assert(!TEST("\022safebrowsingcache-"));
   assert(!TEST("\0225afebrowsingcache-"));
-  assert(!TEST("\0225afebrowingcache-"));
+  assert(TEST("\0225afebrowingcache-"));
   printf("All tests passed.\n");
   exit(0);
 }

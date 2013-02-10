@@ -113,9 +113,11 @@ rr_soa = 6 0 1 attl soa_len encoded_name encoded_name
            soa_serial soa_refresh soa_retry soa_expire soa_minimum;
 rr_cname = 5 0 1 attl @{ memcpy(host_cname_acc, hostname_acc, sizeof(host_cname_acc)); } cname_len encoded_name %{ cb -> process_cname_rr(arg, (void*)host_cname_acc, uint32_attl, (void *) hostname_acc); }; 
 
+rr_ptr = 0x0c 0 1 attl @{ debug(DNS_PARSE, "PTR RR\n"); memcpy(host_cname_acc, hostname_acc, sizeof(host_cname_acc)); } cname_len encoded_name %{ cb -> process_ptr_rr(arg, (void*)host_cname_acc, uint32_attl, (void *) hostname_acc); }; 
+
 rr_aaaa = 0x1c 0 1 attl 0 16 ipv6_addr %{ cb->process_aaaa_rr(arg, (void *)hostname_acc, uint32_attl, uint8_acc); };
 
-rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_aaaa;
+rr_whatever = rr_a | rr_ns | rr_soa | rr_cname | rr_ptr | rr_aaaa;
 
 answer = aname 
              @{ debug(DNS_PARSE, "Answer Name: '%s'\n", hostname_acc); }
@@ -160,7 +162,7 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
   %%write init;
   %%write exec;
-  debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %d, c: 0x%02x\n", 
+  debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %ld, c: 0x%02x\n", 
           res, seglen, p-buf, *p);
   return res;
 }

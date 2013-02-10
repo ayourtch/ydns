@@ -46,6 +46,8 @@ typedef int ((*ydns_aaaa_func_t)(void *arg, char *domainname, uint32_t ttl, uint
 /* We got CNAME address record. Again - none of the data will persist when you return */
 typedef int ((*ydns_cname_func_t)(void *arg, char *domainname, uint32_t ttl, char *cname));
 
+/* We got PTR address record. Again - none of the data will persist when you return */
+typedef int ((*ydns_ptr_func_t)(void *arg, char *domainname, uint32_t ttl, char *cname));
 
 typedef struct decode_callbacks_t {
   ydns_header_func_t             process_header;
@@ -53,6 +55,7 @@ typedef struct decode_callbacks_t {
   ydns_a_func_t                  process_a_rr;
   ydns_aaaa_func_t               process_aaaa_rr;
   ydns_cname_func_t              process_cname_rr;
+  ydns_ptr_func_t                process_ptr_rr;
 } decode_callbacks_t;
 
 

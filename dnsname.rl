@@ -7,12 +7,12 @@ alphtype unsigned char;
 
 
 action hostname_char_s {
-    debugx(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d, pos: %d\n", *p, *p, runlen, p-buf);
+    debugx(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d, pos: %ld\n", *p, *p, runlen, p-buf);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; } 
     else { return 0; }
 }
 action hostname_char_c {
-    debugx(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d, pos: %d\n", *p, *p, runlen, p-buf);
+    debugx(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d, pos: %ld\n", *p, *p, runlen, p-buf);
     if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; }
     else { return 0; }
 }
@@ -55,7 +55,7 @@ action label_start {
 
 label_itself =
       1..63 when not_in_label @label_start
-            letter_only @hostname_char_s
+            letter_or_digit @hostname_char_s
             (
               (dash when in_label | letter_or_digit) @hostname_char_c
                  @{ runlen--; } 
@@ -71,7 +71,7 @@ u_labels := 1..63 @{ fhold; } .
             (label+ .
             compressed_label? @{ 
                         uint16_acc = 256*uint8_acc[0] + *p;
-                        debugx(DNS_PARSE, "Second Jump p from %d to %d (content: 0x%02x)\n", 
+                        debugx(DNS_PARSE, "Second Jump p from %ld to %d (content: 0x%02x)\n", 
                         p - buf, uint16_acc, *p);
                         p = buf + uint16_acc -1;
 			if(++label_indirection > max_label_indirection) {
@@ -82,7 +82,7 @@ u_labels := 1..63 @{ fhold; } .
                     })
 
                     $!{fhold; 
-                      debugx(DNS_PARSE, "Returning from %d to %d\n", 
+                      debugx(DNS_PARSE, "Returning from %ld to %ld\n", 
                             p-buf, sav_p-buf); 
                       p = sav_p; 
                       fret;};
@@ -92,7 +92,7 @@ action uncompress_name {
   sav_p = p;
   if (p-buf > uint16_acc) {
     p = buf + uint16_acc -1;
-    debugx(DNS_PARSE, "Jump p from %d to %d (content: 0x%02x)\n", 
+    debugx(DNS_PARSE, "Jump p from %ld to %ld (content: 0x%02x)\n", 
           sav_p - buf, p-buf, *p);
     fcall u_labels;
   } else {
