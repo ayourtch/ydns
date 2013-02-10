@@ -56,7 +56,7 @@ int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, u
      |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
      +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ 
       0   0  0  0  0  0  0  1  0  0 0  0  0  0  0  0   */
-  uint16_t opcode_flags = 0b0000000100000000;
+  uint16_t opcode_flags = 0x0100;
   uint16_t qdcount = 1;
   uint16_t ancount = 0;
   uint16_t nscount = 0;
