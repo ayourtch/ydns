@@ -6,6 +6,7 @@ ydns.so: reply.c request.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so reply.c request.c ydns.c
 clean:
 	rm -f *.o dnstest reply.c *.so
+	rm -rf *.dSYM
 	rm -f test-dnsname.c test-dnsname test-label test-label.c
 
 reply.c: reply.rl dnsname.rl
