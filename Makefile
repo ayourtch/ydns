@@ -1,11 +1,15 @@
-all: test-label-run test-dnsname-run dnstest
+all: test-label-run test-dnsname-run dnstest dnsstest
 
 dnstest: reply.c request.c dnstest.c dns.h
 	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c request.c dnstest.c
+
+dnsstest: dnsstest.c
+	gcc -g -Werror -Wall -Wno-unused -o dnsstest dnsstest.c
+
 ydns.so: reply.c request.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so reply.c request.c ydns.c
 clean:
-	rm -f *.o dnstest reply.c *.so
+	rm -f *.o dnstest dnsstest reply.c *.so
 	rm -rf *.dSYM
 	rm -f test-dnsname.c test-dnsname test-label test-label.c
 
