@@ -13,9 +13,10 @@ action response_is_truncated   { (*p | 0x5) == 0x87 }
 action response_is_full        { (*p | 0x5) == 0x85 }
 
 cf_byte1 = any when response_is_truncated 
-               @{ debug(DNS_PARSE, "Response is truncated\n"); trunc_acc = 1; } 
+               @{ debug(DNS_PARSE, "Response is truncated\n"); trunc_acc = 1; flags_acc = *p; } 
          | any when response_is_full
-               @{ debug(DNS_PARSE, "Response is in full\n"); trunc_acc = 0; };
+               @{ debug(DNS_PARSE, "Response is in full\n"); trunc_acc = 0; flags_acc = *p; }
+         | any @{ debug(DNS_PARSE, "Probably a request\n"); flags_acc = *p; };
 
 action rc_is_no_error        { DNS_RC(*p) == 0 }
 action rc_is_format_error    { DNS_RC(*p) == 1 }
@@ -125,13 +126,14 @@ answer = aname
 
 answers = answer+ >{ debug(DNS_PARSE,"Entering answers\n"); };
 
-main := req_header @{ cb->process_header(arg, xid_acc, trunc_acc, errcode_acc, qdcount_acc, ancount_acc, nscount_acc, arcount_acc); } 
-                                     questions answers >/{ res = 2; } 
+main := req_header @{ cb->process_header(arg, xid_acc, flags_acc, trunc_acc, errcode_acc, qdcount_acc, ancount_acc, nscount_acc, arcount_acc); } 
+                                     questions >{ res = 11; } answers 
                                      @{ res = 1; };
 
 
 }%%
 
+/*  >/{ res = 2; }  */
 
 %%write data;
 
@@ -155,11 +157,13 @@ int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callback
   unsigned long uint32_attl;
   int xid_acc;
   int qdcount_acc, ancount_acc, nscount_acc, arcount_acc, trunc_acc, errcode_acc;
+  int flags_acc;
   int qtype_acc, qclass_acc;
   int top;
   int stack[10];
   
   debug(DNS_PARSE,"Parsing reply, length: %d\n", buflen);
+  trunc_acc = 0;
   %%write init;
   %%write exec;
   debug(DNS_PARSE,"parse result: %d, seglen: %d, pos: %ld, c: 0x%02x\n", 

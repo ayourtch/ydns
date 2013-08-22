@@ -15,9 +15,9 @@ unsigned char buf[1500];
 
 
 
-static int my_header(void *arg, int req_id, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
-  printf("Header: req_id: %d, trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n", 
-          req_id, trunc, errcode, qdcount, ancount, nscount, arcount);
+static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
+  printf("Header: req_id: %d, flags: %x, trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n", 
+          req_id, flags, trunc, errcode, qdcount, ancount, nscount, arcount);
   return 1;
 }
 static int my_question(void *arg, char *domainname, int type, int class) {
