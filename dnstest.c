@@ -59,8 +59,7 @@ decode_callbacks_t my_cb = {
 
 int main(int argc, char *argv[]) {
   int sock;
-  struct sockaddr_in server_addr;
-  struct hostent *host;
+  struct sockaddr_in6 server_addr;
   unsigned char *p = buf;
   int enclen;
   int nread;
@@ -99,22 +98,20 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  host= (struct hostent *) gethostbyname((char *)argv[1]);
 
-
-  if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+  if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
 
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(53);
-  server_addr.sin_addr = *((struct in_addr *)host->h_addr);
-  bzero(&(server_addr.sin_zero),8);
+  bzero(&server_addr, sizeof(server_addr));
+  server_addr.sin6_family = AF_INET6;
+  server_addr.sin6_port = htons(53);
+  inet_pton(AF_INET6, argv[1], &server_addr.sin6_addr);
   if(ydns_encode_request(&p, sizeof(buf), atoi(argv[2]), argv[3], 0x1234)) {
         enclen = p-buf; 
         sendto(sock, buf, enclen, 0,
-              (struct sockaddr *)&server_addr, sizeof(struct sockaddr));
+              (struct sockaddr *)&server_addr, sizeof(server_addr));
         printf("Waiting for reply...\n");
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
