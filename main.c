@@ -68,6 +68,34 @@ int main(int argc, char *argv[]) {
 
   if(argc < 4) {
     printf("Usage: %s <recursive DNS> <type> <DNS name>\n", argv[0]);
+    printf("Some useful record types:\n");
+    printf("    AAAA        28    RFC3596\n");
+    printf("    A            1    RFC1035\n");
+    printf("    SOA          6    RFC1035 and RFC2308\n");
+    printf("    CNAME        5    RFC1035\n");
+    printf("    MX          15    RFC1035\n");
+    printf("    TXT         16    RFC1035\n");
+    printf("    SRV         33    RFC2782\n");
+    printf("    NAPTR       35    RFC3404\n");
+    printf("    CAA        257    RFC6844\n");
+    printf("    CERT        37    RFC4398\n");
+    printf("    DNSKEY      48    RFC4034\n");
+    printf("    DS          43    RFC4034\n");
+    printf("    IPSECKEY    45    RFC4025\n");
+    printf("    KEY         25    RFC2535 and RFC2930\n");
+    printf("    LOC         29    RFC1876\n");
+    printf("    NS           2    RFC1035\n");
+    printf("    NSEC        47    RFC4043\n");
+    printf("    NSEC3       50    RFC5155\n");
+    printf("    NSEC3PARAM  51    RFC5155\n");
+    printf("    PTR         12    RFC1035\n");
+    printf("    RRSIG       46    RFC4034\n");
+    printf("    SIG         24    RFC2535\n");
+    printf("    SPF         99    RFC4408\n");
+    printf("    SSHFP       44    RFC4255\n");
+    printf("    TKEY       249    RFC2930\n");
+    printf("    TLSA        52    RFC6698\n");
+    printf("    TSIG       250    RFC2845\n");
     exit(1);
   }
 
