@@ -1,7 +1,7 @@
 all: test-label-run test-dnsname-run dnstest
 
-dnstest: reply.c request.c main.c dns.h
-	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c request.c main.c
+dnstest: reply.c request.c dnstest.c dns.h
+	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c request.c dnstest.c
 ydns.so: reply.c request.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so reply.c request.c ydns.c
 clean:
