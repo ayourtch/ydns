@@ -1,7 +1,7 @@
 all: test-label-run test-dnsname-run dnstest dnsstest
 
-dnstest: reply.c request.c dnstest.c dns.h
-	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c request.c dnstest.c
+dnstest: reply.c build-pdu.c dnstest.c dns.h
+	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c build-pdu.c dnstest.c
 
 dnsstest: dnsstest.c reply.c dns.h
 	gcc -g -Werror -Wall -Wno-unused -o dnsstest dnsstest.c reply.c 
