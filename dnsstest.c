@@ -12,13 +12,28 @@
 
 unsigned char buf[1500];
 
+char question_name[2048];
+int question_type;
+int question_class;
+int question_id;
+
+char *safe_cpy(char *dst, char *src, int sizeofdst) {
+  strncpy(dst, src, sizeofdst-1);
+  dst[sizeofdst-1] = 0;
+  return dst;
+}
+
 static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
   printf("Header: req_id: %d, flags: %x, trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n",
           req_id, flags, trunc, errcode, qdcount, ancount, nscount, arcount);
+  question_id = req_id;
   return 1;
 }
 static int my_question(void *arg, char *domainname, int type, int class) {
   printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
+  safe_cpy(question_name, domainname, sizeof(question_name));
+  question_type = type;
+  question_class = class;
   return 1;
 }
 static int my_a_rr(void *arg, char *domainname, uint32_t ttl, uint32_t addr) {
@@ -58,6 +73,7 @@ int main(int argc, char *argv[]) {
   unsigned char *p = buf;
   int enclen;
   int nread;
+  int result;
   socklen_t sockaddr_sz = sizeof(struct sockaddr);
 
   if(argc < 3) {
@@ -86,7 +102,16 @@ int main(int argc, char *argv[]) {
       nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
       printf("Got %d bytes request..\n", nread);
-      printf("Parse result: %d\n", ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb));
+      result = ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb);
+      printf("Parse result: %d\n", result);
+      if (11 == result) {
+	p = buf;
+	result = ydns_encode_pdu(&p, sizeof(buf), question_type, question_name, question_id,
+		0x8000, 1, 0, 0, 0, question_class);
+        if(result) {
+	  sendto(sock, buf, (p - buf), 0, (struct sockaddr *)&server_addr, sockaddr_sz);
+        }
+      }
   }
   
   return 0;
