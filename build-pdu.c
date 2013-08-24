@@ -113,7 +113,7 @@ int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
   result = result && store_32(&p, pe, expire);
   result = result && store_32(&p, pe, min_ttl);
 
-  result = result && store_16(&ps, pe, (p - *buf)); /* length, now calculated */
+  result = result && store_16(&ps, pe, (p - *buf - 2)); /* length, now calculated */
 
   if (result) {
     *buf = p;
