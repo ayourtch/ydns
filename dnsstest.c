@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
   int sock;
   struct sockaddr_in6 server_addr;
   unsigned char *p = buf;
+  unsigned char *pe = p + sizeof(buf);
   int enclen;
   int nread;
   int result;
@@ -107,7 +108,10 @@ int main(int argc, char *argv[]) {
       if (11 == result) {
 	p = buf;
 	result = ydns_encode_pdu(&p, sizeof(buf), question_type, question_name, question_id,
-		0x8000, 1, 0, 0, 0, question_class);
+		0x8403, 1, 0, 1, 0, question_class);
+	result = result && ydns_encode_rr_start(&p, (pe-p), "sub.stdio.be", 6, 1, 0x5000);
+	result = result && ydns_encode_rr_soa(&p, (pe-p), "sub.stdio.be", "root.sub.stdio.be",
+						12345, 86400, 7200, 604800, 86400);
         if(result) {
 	  sendto(sock, buf, (p - buf), 0, (struct sockaddr *)&server_addr, sockaddr_sz);
         }

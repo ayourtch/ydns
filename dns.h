@@ -44,6 +44,24 @@ int ydns_encode_pdu(unsigned char **buf, int buf_sz,
                 uint16_t arcount,
                 uint16_t qclass); 
 
+/* RR encoding */
+int ydns_encode_rr_start(unsigned char **buf, int buf_sz,
+                char *name,
+                uint16_t type,
+                uint16_t class,
+                uint32_t ttl);
+
+int ydns_encode_rr_data(unsigned char **buf, int buf_sz,
+                        void *src, int len);
+
+int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
+                        char *nsname,
+                        char *admin,
+                        uint32_t serial,
+                        uint32_t refresh,
+                        uint32_t retry,
+                        uint32_t expire,
+                        uint32_t min_ttl); 
 
 /*
  * Called when the header is parsed. Return false, and the processing will stop right there

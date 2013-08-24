@@ -23,6 +23,10 @@ static int store_16(unsigned char **pp, unsigned char *pe, uint16_t val) {
   return (store_8(pp, pe, val >> 8) && store_8(pp, pe, val & 0xff));
 }
 
+static int store_32(unsigned char **pp, unsigned char *pe, uint32_t val) {
+  return (store_16(pp, pe, val >> 16) && store_16(pp, pe, val & 0xffff));
+}
+
 static int store_str(unsigned char **pp, unsigned char *pe, char *str) {
   unsigned char *pce = (void *)str;
   unsigned char *pc = (void *)str;
@@ -47,6 +51,74 @@ static int store_str(unsigned char **pp, unsigned char *pe, char *str) {
   } else {
     return 1;
   }
+}
+
+int ydns_encode_rr_start(unsigned char **buf, int buf_sz,
+		char *name,
+		uint16_t type,
+		uint16_t class,
+		uint32_t ttl) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+
+  result = result && store_str(&p, pe, name);
+  result = result && store_16(&p, pe, type);
+  result = result && store_16(&p, pe, class);
+  result = result && store_32(&p, pe, ttl);
+  if (result) {
+    *buf = p;
+  }
+  return result;
+}
+
+int ydns_encode_rr_data(unsigned char **buf, int buf_sz, 
+			void *src, int len) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+  result = result && store_16(&p, pe, len);
+  if (len <= pe - p) {
+    memcpy(p, src, len);
+    p += len; 
+  } else {
+    result = 0;
+  }
+
+  if (result) {
+    *buf = p;
+  }
+  return result;
+}
+
+int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
+			char *nsname,
+			char *admin,
+			uint32_t serial,
+			uint32_t refresh,
+			uint32_t retry,
+			uint32_t expire,
+			uint32_t min_ttl) {
+  unsigned char *p = *buf;
+  unsigned char *ps = *buf;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+
+  result = result && store_16(&p, pe, 0); /* length, to re-store later */
+  result = result && store_str(&p, pe, nsname);
+  result = result && store_str(&p, pe, admin);
+  result = result && store_32(&p, pe, serial);
+  result = result && store_32(&p, pe, refresh);
+  result = result && store_32(&p, pe, retry);
+  result = result && store_32(&p, pe, expire);
+  result = result && store_32(&p, pe, min_ttl);
+
+  result = result && store_16(&ps, pe, (p - *buf)); /* length, now calculated */
+
+  if (result) {
+    *buf = p;
+  }
+  return result;
 }
 
 int ydns_encode_pdu(unsigned char **buf, int buf_sz, 
