@@ -54,6 +54,7 @@ int parsename(unsigned char *buf, int buflen, int startpos) {
 
 int main(int argc, char *argv[]) {
   assert(TEST("\003foo\006domain\003com\000"));
+  assert(TEST("\x27xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0xxxxxeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\003sub\005stdio\002be\000"));
   assert(TEST("\003f01\006domain\003com\000"));
   assert(TEST("\003f-1\006domain\003com\000"));
   assert(!TEST("\003f_1\006domain\003com\000"));

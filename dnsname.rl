@@ -8,12 +8,12 @@ alphtype unsigned char;
 
 action hostname_char_s {
     debugx(LABEL_DEBUG, "letter(sta): '%c'(0x%02x), run: %d, pos: %ld\n", *p, *p, runlen, p-buf);
-    if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; } 
+    if(acchpos < HOSTNAME_SZ) { if (runlen >= 0) { hostname_acc[acchpos++] = *p; } }
     else { return 0; }
 }
 action hostname_char_c {
     debugx(LABEL_DEBUG, "letter(cnt): '%c'(0x%02x), run: %d, pos: %ld\n", *p, *p, runlen, p-buf);
-    if(acchpos < HOSTNAME_SZ) { hostname_acc[acchpos++] = *p; }
+    if(acchpos < HOSTNAME_SZ) { if (runlen >= 0) { hostname_acc[acchpos++] = *p; } }
     else { return 0; }
 }
 
