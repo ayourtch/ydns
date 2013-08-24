@@ -23,7 +23,27 @@ int parse_dns_reply(unsigned char *buf, int buflen);
 
 #define DNS_RC(x) ((x) & 0x0f)
 
+/*
+ * A simple API to encode a request: pass the type/name, id, the buffer size 
+ * and the pointer to the pointer to the buffer.
+ * The *buf will be modified to point to the first byte past end of the buffer upon success (return 1);
+ */
 int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, uint16_t id);
+
+/*
+ * A more generic version with more arguments but the same logic as above. 
+ */
+int ydns_encode_pdu(unsigned char **buf, int buf_sz,
+                uint16_t qtype,
+                char *name,
+                uint16_t id,
+                uint16_t opcode_flags,
+                uint16_t qdcount,
+                uint16_t ancount,
+                uint16_t nscount,
+                uint16_t arcount,
+                uint16_t qclass); 
+
 
 /*
  * Called when the header is parsed. Return false, and the processing will stop right there
