@@ -1,20 +1,20 @@
 all: test-label-run test-dnsname-run dnstest dnsstest
 
-dnstest: reply.c build-pdu.c dnstest.c dns.h
-	gcc -g -Werror -Wall -Wno-unused -o dnstest reply.c build-pdu.c dnstest.c
+dnstest: parse-pdu.c build-pdu.c dnstest.c dns.h
+	gcc -g -Werror -Wall -Wno-unused -o dnstest parse-pdu.c build-pdu.c dnstest.c
 
-dnsstest: dnsstest.c reply.c dns.h
-	gcc -g -Werror -Wall -Wno-unused -o dnsstest dnsstest.c reply.c 
+dnsstest: dnsstest.c parse-pdu.c dns.h
+	gcc -g -Werror -Wall -Wno-unused -o dnsstest dnsstest.c parse-pdu.c 
 
-ydns.so: reply.c request.c ydns.c dns.h
-	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so reply.c request.c ydns.c
+ydns.so: parse-pdu.c build-pdu.c ydns.c dns.h
+	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so parse-pdu.c build-pdu.c ydns.c
 clean:
-	rm -f *.o dnstest dnsstest reply.c *.so
+	rm -f *.o dnstest dnsstest parse-pdu.c *.so
 	rm -rf *.dSYM
 	rm -f test-dnsname.c test-dnsname test-label test-label.c
 
-reply.c: reply.rl dnsname.rl
-	ragel -e reply.rl
+parse-pdu.c: parse-pdu.rl dnsname.rl
+	ragel -e parse-pdu.rl
 
 view-label:
 	ragel -e -p -V view-label.rl | dotty -
