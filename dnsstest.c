@@ -69,7 +69,9 @@ decode_callbacks_t my_cb = {
 
 int main(int argc, char *argv[]) {
   int sock;
-  struct sockaddr_in6 server_addr;
+  char str_addr[1024];
+  struct sockaddr_in6 v6_addr;
+  struct sockaddr_in *pv4_addr;
   unsigned char *p = buf;
   unsigned char *pe = p + sizeof(buf);
   int enclen;
@@ -88,11 +90,11 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  bzero(&server_addr, sizeof(server_addr));
-  server_addr.sin6_family = AF_INET6;
-  server_addr.sin6_port = htons(atoi(argv[2]));
-  inet_pton(AF_INET6, argv[1], &server_addr.sin6_addr);
-  if (0 > bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+  bzero(&v6_addr, sizeof(v6_addr));
+  v6_addr.sin6_family = AF_INET6;
+  v6_addr.sin6_port = htons(atoi(argv[2]));
+  inet_pton(AF_INET6, argv[1], &v6_addr.sin6_addr);
+  if (0 > bind(sock, (struct sockaddr *)&v6_addr, sizeof(v6_addr))) {
     perror("bind");
     exit(1);
   }
@@ -101,8 +103,16 @@ int main(int argc, char *argv[]) {
       printf("Waiting for a request...\n");
       sockaddr_sz = sizeof(struct sockaddr);
       nread = recvfrom(sock, buf, sizeof(buf), 0,
-	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
-      printf("Got %d bytes request..\n", nread);
+	      (struct sockaddr *)&v6_addr, &sockaddr_sz); 
+      printf("Got %d bytes request, family: %d (%d/%d)..\n", nread, v6_addr.sin6_family, AF_INET, AF_INET6);
+      if (AF_INET == v6_addr.sin6_family) {
+        printf("IPv4 packet, convert sockaddr into IPv6 for sendto\n");
+        pv4_addr = (void *)&v6_addr;
+        snprintf(str_addr, sizeof(str_addr)-1, "::ffff:%s", inet_ntoa(pv4_addr->sin_addr));
+        v6_addr.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, str_addr, &v6_addr.sin6_addr);
+	sockaddr_sz = sizeof(struct sockaddr_in6);
+      }
       result = ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb);
       printf("Parse result: %d\n", result);
       if (11 == result) {
@@ -113,7 +123,8 @@ int main(int argc, char *argv[]) {
 	result = result && ydns_encode_rr_soa(&p, (pe-p), "sub.stdio.be", "root.sub.stdio.be",
 						12345, 86400, 7200, 604800, 86400);
         if(result) {
-	  sendto(sock, buf, (p - buf), 0, (struct sockaddr *)&server_addr, sockaddr_sz);
+	  sendto(sock, buf, (p - buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
+	  perror("sendto");
         }
       }
   }
