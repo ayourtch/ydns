@@ -49,23 +49,19 @@ static int store_str(unsigned char **pp, unsigned char *pe, char *str) {
   }
 }
 
-int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, uint16_t id) {
+int ydns_encode_pdu(unsigned char **buf, int buf_sz, 
+		uint16_t qtype,
+		char *name,
+		uint16_t id,
+		uint16_t opcode_flags, 
+		uint16_t qdcount,
+		uint16_t ancount,
+		uint16_t nscount,
+		uint16_t arcount,
+		uint16_t qclass) {
   unsigned char *p = *buf;
   unsigned char *pe = p + buf_sz;
-  /* +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ 
-      0   0  0  0  0  0  0  1  0  0 0  0  0  0  0  0   */
-  uint16_t opcode_flags = 0x0100;
-  uint16_t qdcount = 1;
-  uint16_t ancount = 0;
-  uint16_t nscount = 0;
-  uint16_t arcount = 0;
-  uint16_t qtype = type;
-  uint16_t qclass = 1;
-  
   int result = 1;
-
   debug("Encoding start, p:%p, pe: %p\n", (void *)p, (void *)pe);
 
   result = result && store_16(&p, pe, id);
@@ -81,5 +77,24 @@ int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, u
     *buf = p;
   }
   return result;
+}
+
+
+int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, uint16_t id) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
+  /* +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+     |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ 
+      0   0  0  0  0  0  0  1  0  0 0  0  0  0  0  0   */
+  uint16_t opcode_flags = 0x0100;
+  uint16_t qdcount = 1;
+  uint16_t ancount = 0;
+  uint16_t nscount = 0;
+  uint16_t arcount = 0;
+  uint16_t qtype = type;
+  uint16_t qclass = 1;
+
+  return ydns_encode_pdu(buf, buf_sz, qtype, name, id, opcode_flags, qdcount, ancount, nscount, arcount, qclass);
 }
 
