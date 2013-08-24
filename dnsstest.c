@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
       if (11 == result) {
         int nans = 0;
 	p = buf;
-	if ( (question_type == 28) || (question_type == 1)) {
+	if ( (question_type == 28) || (question_type == 1) || (question_type == 16)) {
 	  nans++;
         }
 	result = ydns_encode_pdu(&p, sizeof(buf), question_type, question_name, question_id,
@@ -129,6 +129,9 @@ int main(int argc, char *argv[]) {
 	} else if (question_type == 28) {
 	  result = result && ydns_encode_rr_start(&p, (pe-p), question_name, question_type, 1, 0x5000);
 	  result = result && ydns_encode_rr_data(&p, (pe-p), "\x20\x01\x0d\xb8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01", 16);
+	} else if (question_type == 16) {
+	  result = result && ydns_encode_rr_start(&p, (pe-p), question_name, question_type, 1, 0x5000);
+	  result = result && ydns_encode_rr_data(&p, (pe-p), "\011some text", 10);
         }
 	result = result && ydns_encode_rr_start(&p, (pe-p), "sub.stdio.be", 6, 1, 0x5000);
 	result = result && ydns_encode_rr_soa(&p, (pe-p), "sub.stdio.be", "root.sub.stdio.be",
