@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 	      (struct sockaddr *)&v6_addr, &sockaddr_sz); 
       printf("Got %d bytes request, family: %d (%d/%d)..\n", nread, v6_addr.sin6_family, AF_INET, AF_INET6);
       if (AF_INET == v6_addr.sin6_family) {
-        printf("IPv4 packet, convert sockaddr into IPv6 for sendto\n");
+        printf("IPv4 pkt on IPv4-mapped address socket, convert sockaddr into IPv6 for sendto\n");
         pv4_addr = (void *)&v6_addr;
         snprintf(str_addr, sizeof(str_addr)-1, "::ffff:%s", inet_ntoa(pv4_addr->sin_addr));
         v6_addr.sin6_family = AF_INET6;
