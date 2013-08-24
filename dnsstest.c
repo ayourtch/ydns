@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
   int enclen;
   int nread;
   int result;
-  socklen_t sockaddr_sz = sizeof(struct sockaddr);
+  socklen_t sockaddr_sz;
 
   if(argc < 3) {
     printf("Usage: %s <bind-addr> <port>\n", argv[0]);
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 
   while (1) {
       printf("Waiting for a request...\n");
-      sockaddr_sz = sizeof(struct sockaddr);
+      sockaddr_sz = sizeof(v6_addr);
       nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&v6_addr, &sockaddr_sz); 
       printf("Got %d bytes request, family: %d (%d/%d)..\n", nread, v6_addr.sin6_family, AF_INET, AF_INET6);
