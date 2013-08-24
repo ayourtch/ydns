@@ -25,6 +25,7 @@ letter_or_digit = [a-zA-Z0-9];
 
 
 action in_label { runlen > 0 }
+action in_or_end_label { runlen >= 0 }
 action not_in_label { runlen < 0 }
 action check_label_len { 
     if(runlen >0) { 
@@ -57,7 +58,7 @@ label_itself =
       1..63 when not_in_label @label_start
             letter_or_digit @hostname_char_s
             (
-              (dash when in_label | letter_or_digit) @hostname_char_c
+              (dash when in_label | letter_or_digit when in_or_end_label) @hostname_char_c
                  @{ runlen--; } 
             )**;
 
