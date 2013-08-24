@@ -116,9 +116,20 @@ int main(int argc, char *argv[]) {
       result = ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb);
       printf("Parse result: %d\n", result);
       if (11 == result) {
+        int nans = 0;
 	p = buf;
+	if ( (question_type == 28) || (question_type == 1)) {
+	  nans++;
+        }
 	result = ydns_encode_pdu(&p, sizeof(buf), question_type, question_name, question_id,
-		0x8403, 1, 0, 1, 0, question_class);
+		nans > 0 ? 0x8400 : 0x8400, 1, nans, 1, 0, question_class);
+	if (question_type == 1) {
+	  result = result && ydns_encode_rr_start(&p, (pe-p), question_name, question_type, 1, 0x5000);
+	  result = result && ydns_encode_rr_data(&p, (pe-p), "\xc0\000\002\001", 4);
+	} else if (question_type == 28) {
+	  result = result && ydns_encode_rr_start(&p, (pe-p), question_name, question_type, 1, 0x5000);
+	  result = result && ydns_encode_rr_data(&p, (pe-p), "\x20\x01\x0d\xb8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01", 16);
+        }
 	result = result && ydns_encode_rr_start(&p, (pe-p), "sub.stdio.be", 6, 1, 0x5000);
 	result = result && ydns_encode_rr_soa(&p, (pe-p), "sub.stdio.be", "root.sub.stdio.be",
 						12345, 86400, 7200, 604800, 86400);
