@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
   int enclen;
   int nread;
   int result;
+  int listen_port;
   socklen_t sockaddr_sz;
 
   if(argc < 3) {
@@ -89,14 +90,27 @@ int main(int argc, char *argv[]) {
     perror("socket");
     exit(1);
   }
-
+  listen_port = atoi(argv[2]);
   bzero(&v6_addr, sizeof(v6_addr));
   v6_addr.sin6_family = AF_INET6;
-  v6_addr.sin6_port = htons(atoi(argv[2]));
+  v6_addr.sin6_port = htons(listen_port);
   inet_pton(AF_INET6, argv[1], &v6_addr.sin6_addr);
   if (0 > bind(sock, (struct sockaddr *)&v6_addr, sizeof(v6_addr))) {
     perror("bind");
     exit(1);
+  }
+  if (5353 == listen_port) {
+    struct ipv6_mreq mreq;  /* Multicast address join structure */
+    printf("You specified the port 5353, I will try to join the multicast group ff02::fb\n");
+    inet_pton(AF_INET6, "ff02::fb", &v6_addr.sin6_addr);
+    memcpy(&mreq.ipv6mr_multiaddr,
+           &((struct sockaddr_in6*)(&v6_addr))->sin6_addr,
+               sizeof(mreq.ipv6mr_multiaddr));
+    /* Accept from any interface */
+    mreq.ipv6mr_interface = 0;
+    if ( setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) != 0 ) {
+      printf("Error joining multicast group\n");
+    }
   }
 
   while (1) {
