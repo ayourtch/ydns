@@ -67,6 +67,8 @@ decode_callbacks_t my_cb = {
   .process_ptr_rr = my_ptr_rr,
 };
 
+#define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
+
 int main(int argc, char *argv[]) {
   int sock;
   char str_addr[1024];
