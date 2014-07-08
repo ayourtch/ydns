@@ -33,7 +33,9 @@ static int store_str(unsigned char **pp, unsigned char *pe, char *str) {
   int len;
   while(*pc && (*pp < pe)) {
     /* find the length of the next name segment */
-    for(len=0, pce=pc; ((len < 64) && (*pce) && (*pce != '.')); pce++, len++);
+    for(len=0, pce=pc; ((len < 64) && (*pce) && (*pce != '.')); pce++, len++) {
+      ;
+    }
     debug(STORE_STR, "Seg len: %ld (len: %d)\n", pce-pc, len);
     if(len > 63) { return 0; }
     /* try to store this name segment to target buffer */
