@@ -84,7 +84,7 @@ int get_bytestring(parse_state_t *ps, uint16_t rdlength_in, uint16_t rdlength, c
 }
 
 int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
-              uint16_t *class, uint32_t *ttl, uint16_t rdlength_in, uint16_t *rdlength, char *rdata) {
+              uint16_t *class, uint32_t *ttl, uint16_t *rdlength) {
   int namelen;
 
   if(decode_domain(ps, 255, &namelen, name)) {
@@ -100,9 +100,6 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
     return ps->err;
   }
   if(decode_u16(ps, rdlength)) {
-    return ps->err;
-  }
-  if(get_bytestring(ps, rdlength_in, *rdlength, rdata)) {
     return ps->err;
   }
   return ps->err;
@@ -155,7 +152,11 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
   }
   for(i = P_ANCOUNT; i <= P_ARCOUNT; i++) {
     for(j=0; j<ph[i]; j++) {
-      if(decode_rr(ps, namebuf, &type, &class, &ttl, sizeof(rdata), &rdlength, rdata)) {
+      if(decode_rr(ps, namebuf, &type, &class, &ttl, &rdlength) {
+        return ps->err;
+      }
+      /* FIXME: process RDATA according to types. */
+      if(get_bytestring(ps, sizeof(rdata), rdlength, rdata)) {
         return ps->err;
       }
     }
