@@ -2,19 +2,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include "dns.h"
 
 enum {
   ERR_OK = 0,
   ERR_OVERRUN,
-  ERR_RDATA_BIG
+  ERR_RDATA_BIG,
+  ERR_DOMAIN_END,
+  ERR_MALFORMED_NAME
 };
 
 typedef struct parse_state {
+  char *pb;
   char *p;
   char *pe;
   int err;
 } parse_state_t;
+
+typedef struct domain_parse_state {
+  char *pb;
+  char *p;
+  char *pe;
+  int err;
+} domain_parse_state_t;
 
 typedef void (*char_store_cb_t)(char c);
 
@@ -37,6 +48,44 @@ int decode_label(parse_state_t *ps, void *arg, char_store_cb_t cb) {
 }
 
 int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
+  int n = 10;
+  char *sp = NULL;
+  domain_parse_state_t domain_ps, *dps = &domain_ps;
+
+  dps->pb = ps->pb;
+  dps->p = ps->p;
+  dps->pe = ps->pe;
+  dps->err = 0;
+
+  while (!dps->err) {
+    if(0xc0 == (*dps->p & 0xc0)) {
+      if (--n > 0) {
+        int offs_hi = (0x3f & *dps->p++);
+        int offs = offs_hi * 256 + *dps->p++;
+        debug(0, "jump: %d\n", offs);
+        if(!sp) {
+          sp = dps->p;
+        }
+        dps->p = dps->pb + offs;
+      } else {
+        ps->err = ERR_MALFORMED_NAME;
+        return ps->err;
+      }
+    } else {
+      if (*dps->p) {
+        debug(0, "label: %d\n", *dps->p);
+        dps->p += 1 + *dps->p;
+      } else {
+        dps->err = ERR_DOMAIN_END;
+        dps->p++;
+      }
+    }
+  }
+  if(ERR_DOMAIN_END == dps->err) {
+    ps->p = sp ? sp : dps->p;
+  } else {
+    ps->err = dps->err;
+  }
   return ps->err;
 }
 
@@ -80,6 +129,7 @@ int get_bytestring(parse_state_t *ps, uint16_t rdlength_in, uint16_t rdlength, c
     return ps->err;
   }
   memcpy(rdata, ps->p, rdlength);
+  ps->p += rdlength;
   return ps->err;
 }
 
@@ -129,7 +179,7 @@ typedef enum {
 int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbacks_t *cb) {
   parse_state_t pstate, *ps = &pstate;
   char namebuf[256];
-  uint16_t type, class, rdlength;
+  uint16_t type = 0, class = 0, rdlength = 0;
   uint32_t ttl;
   char rdata[256];
 
@@ -137,7 +187,7 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
   int i, j;
 
   ps->err = 0;
-  ps->p = (void *)buf;
+  ps->pb = ps->p = (void *)buf;
   ps->pe = ps->p + buflen;
 
   for(i=0; i<P_TOTALFIELDS; i++) {
@@ -145,16 +195,20 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
       return ps->err;
     }
   }
+  debug(0, "PDU decode ID: %04x flags: %04x qdcount: %d ancount: %d, nscount: %d, arcount: %d\n",
+                         ph[P_ID], ph[P_FLAGS], ph[P_QDCOUNT], ph[P_ANCOUNT], ph[P_NSCOUNT], ph[P_ARCOUNT]);
   for(i=0; i<ph[P_QDCOUNT]; i++) {
     if(decode_question(ps, namebuf, &type, &class)) {
       return ps->err;
     }
+    debug(0, "Q: type: %d class: %d\n", type, class);
   }
   for(i = P_ANCOUNT; i <= P_ARCOUNT; i++) {
     for(j=0; j<ph[i]; j++) {
-      if(decode_rr(ps, namebuf, &type, &class, &ttl, &rdlength) {
+      if(decode_rr(ps, namebuf, &type, &class, &ttl, &rdlength)) {
         return ps->err;
       }
+      debug(0, "RR type: %d, class: %d, ttl: %" PRIx32 ", rdlen: %d\n", type, class, ttl, rdlength);
       /* FIXME: process RDATA according to types. */
       if(get_bytestring(ps, sizeof(rdata), rdlength, rdata)) {
         return ps->err;
@@ -165,6 +219,5 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
 }
 
 int ydns_decode_reply(unsigned char *buf, int buflen, void *arg, decode_callbacks_t *cb) {
-
-  return 0;
+  return ydns_decode_packet(buf, buflen, arg, cb);
 }

@@ -16,7 +16,7 @@ unsigned char buf[1500];
 
 
 static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
-  printf("Header: req_id: %d, flags: %x, trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n", 
+  printf("Header: req_id: %d, flags: %x, trunc: %d; errcode: %d, qdcount: %d, ancount: %d, nscount: %d, arcount: %d\n",
           req_id, flags, trunc, errcode, qdcount, ancount, nscount, arcount);
   return 1;
 }
@@ -109,13 +109,13 @@ int main(int argc, char *argv[]) {
   server_addr.sin6_port = htons(53);
   inet_pton(AF_INET6, argv[1], &server_addr.sin6_addr);
   if(ydns_encode_request(&p, sizeof(buf), atoi(argv[2]), argv[3], 0x1234)) {
-        enclen = p-buf; 
+        enclen = p-buf;
         sendto(sock, buf, enclen, 0,
               (struct sockaddr *)&server_addr, sizeof(server_addr));
         printf("Waiting for reply...\n");
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
-	      (struct sockaddr *)&server_addr, &sockaddr_sz); 
+	      (struct sockaddr *)&server_addr, &sockaddr_sz);
         printf("Parse result: %d\n", ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb));
   } else {
         printf("Could not encode name!\n");
