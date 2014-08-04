@@ -65,7 +65,7 @@ int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
       if (--n > 0) {
         int offs_hi = (0x3f & *dps->p++);
         int offs = offs_hi * 256 + (unsigned char)*dps->p++;
-        debug(0, "jump: %d\n", offs);
+        debugx(0, "jump: %d\n", offs);
         if(!sp) {
           sp = dps->p;
         }
@@ -76,7 +76,7 @@ int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
       }
     } else {
       if (*dps->p) {
-        debug(0, "label: %d\n", *dps->p);
+        debugx(0, "label: %d\n", *dps->p);
         if (*dsz + 1 + *dps->p < dmaxsz) {
           memcpy(pd, 1 + dps->p, *dps->p);
           pd += *dps->p;
