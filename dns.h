@@ -23,6 +23,19 @@ int parse_dns_reply(unsigned char *buf, int buflen);
 
 #define DNS_RC(x) ((x) & 0x0f)
 
+
+enum {
+  DNS_T_A = 1,
+  DNS_T_NS,
+  DNS_T_CNAME = 5,
+  DNS_T_SOA,
+  DNS_T_PTR = 12,
+  DNS_T_MX = 15,
+  DNS_T_TXT = 16,
+  DNS_T_AAAA = 28,
+  DNS_T_X
+};
+
 /*
  * A simple API to encode a request: pass the type/name, id, the buffer size 
  * and the pointer to the pointer to the buffer.

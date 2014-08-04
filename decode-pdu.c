@@ -150,7 +150,6 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
   if(decode_domain(ps, 255, &namelen, name)) {
     return ps->err;
   }
-  printf("Name: %s\n", name);
   if(decode_u16(ps, type)) {
     return ps->err;
   }
@@ -173,7 +172,6 @@ int decode_question(parse_state_t *ps, char *qname, uint16_t *qtype, uint16_t *q
   if(decode_domain(ps, 255, &qnamelen, qname)) {
     return ps->err;
   }
-  printf("Q Name: %s\n", qname);
   if(decode_u16(ps, qtype)) {
     return ps->err;
   }
@@ -209,11 +207,18 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
   }
   debug(0, "PDU decode ID: %04x flags: %04x qdcount: %d ancount: %d, nscount: %d, arcount: %d\n",
                          ph[P_ID], ph[P_FLAGS], ph[P_QDCOUNT], ph[P_ANCOUNT], ph[P_NSCOUNT], ph[P_ARCOUNT]);
+  if (cb->process_header) {
+    cb->process_header(arg, ph[P_ID], ph[P_FLAGS], 0x200 & ph[P_FLAGS], 0xF & ph[P_FLAGS],
+                            ph[P_QDCOUNT], ph[P_ANCOUNT], ph[P_NSCOUNT], ph[P_ARCOUNT]);
+  }
   for(i=0; i<ph[P_QDCOUNT]; i++) {
     if(decode_question(ps, namebuf, &type, &class)) {
       return ps->err;
     }
     debug(0, "Q: type: %d class: %d\n", type, class);
+    if(cb->process_question) {
+      cb->process_question(arg, namebuf, type, class);
+    }
   }
   for(i = P_ANCOUNT; i <= P_ARCOUNT; i++) {
     for(j=0; j<ph[i]; j++) {
@@ -224,6 +229,29 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
       /* FIXME: process RDATA according to types. */
       if(get_bytestring(ps, sizeof(rdata), rdlength, rdata)) {
         return ps->err;
+      }
+      switch(type) {
+        case DNS_T_A:
+          if(cb->process_a_rr) {
+	    cb->process_a_rr(arg, namebuf, ttl, *((uint32_t *)rdata));
+          }
+	  break;
+        case DNS_T_AAAA:
+          if(cb->process_aaaa_rr) {
+	    cb->process_aaaa_rr(arg, namebuf, ttl, (uint8_t *)&rdata[0]);
+          }
+	  break;
+        case DNS_T_CNAME:
+          if(cb->process_cname_rr) {
+	    cb->process_cname_rr(arg, namebuf, ttl, rdata);
+          }
+	  break;
+        case DNS_T_PTR:
+          if(cb->process_ptr_rr) {
+	    cb->process_ptr_rr(arg, namebuf, ttl, rdata);
+          }
+	  break;
+
       }
     }
   }
