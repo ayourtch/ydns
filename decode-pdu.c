@@ -47,14 +47,14 @@ int decode_label(parse_state_t *ps, void *arg, char_store_cb_t cb) {
   return(ps->err);
 }
 
-int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
+int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *domain) {
   int n = 10;
   char *sp = NULL;
   char *pd = domain;
   domain_parse_state_t domain_ps, *dps = &domain_ps;
 
   dps->pb = ps->pb;
-  dps->p = ps->p;
+  dps->p = *pp;
   dps->pe = ps->pe;
   dps->err = 0;
 
@@ -92,7 +92,7 @@ int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
     }
   }
   if(ERR_DOMAIN_END == dps->err) {
-    ps->p = sp ? sp : dps->p;
+    *pp = sp ? sp : dps->p;
   } else {
     ps->err = dps->err;
   }
@@ -147,7 +147,7 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
               uint16_t *class, uint32_t *ttl, uint16_t *rdlength) {
   int namelen;
 
-  if(decode_domain(ps, 255, &namelen, name)) {
+  if(decode_domain(ps, &ps->p, 255, &namelen, name)) {
     return ps->err;
   }
   if(decode_u16(ps, type)) {
@@ -169,7 +169,7 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
 int decode_question(parse_state_t *ps, char *qname, uint16_t *qtype, uint16_t *qclass) {
   int qnamelen;
 
-  if(decode_domain(ps, 255, &qnamelen, qname)) {
+  if(decode_domain(ps, &ps->p, 255, &qnamelen, qname)) {
     return ps->err;
   }
   if(decode_u16(ps, qtype)) {
@@ -189,9 +189,11 @@ typedef enum {
 int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbacks_t *cb) {
   parse_state_t pstate, *ps = &pstate;
   char namebuf[256];
+  char namebuf2[256];
+  int namelen2;
   uint16_t type = 0, class = 0, rdlength = 0;
   uint32_t ttl;
-  char rdata[256];
+  char rdata[256], *prdata = rdata;
 
   uint16_t ph[P_TOTALFIELDS];
   int i, j;
@@ -243,12 +245,20 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
 	  break;
         case DNS_T_CNAME:
           if(cb->process_cname_rr) {
-	    cb->process_cname_rr(arg, namebuf, ttl, rdata);
+            prdata = rdata;
+            if(decode_domain(ps, &prdata, sizeof(namebuf2)-1, &namelen2, namebuf2)) {
+              return ps->err;
+            }
+	    cb->process_cname_rr(arg, namebuf, ttl, namebuf2);
           }
 	  break;
         case DNS_T_PTR:
           if(cb->process_ptr_rr) {
-	    cb->process_ptr_rr(arg, namebuf, ttl, rdata);
+            prdata = rdata;
+            if(decode_domain(ps, &prdata, sizeof(namebuf2)-1, &namelen2, namebuf2)) {
+              return ps->err;
+            }
+	    cb->process_ptr_rr(arg, namebuf, ttl, namebuf2);
           }
 	  break;
 
