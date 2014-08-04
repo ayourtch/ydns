@@ -50,6 +50,7 @@ int decode_label(parse_state_t *ps, void *arg, char_store_cb_t cb) {
 int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
   int n = 10;
   char *sp = NULL;
+  char *pd = domain;
   domain_parse_state_t domain_ps, *dps = &domain_ps;
 
   dps->pb = ps->pb;
@@ -57,11 +58,13 @@ int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
   dps->pe = ps->pe;
   dps->err = 0;
 
+  *dsz = 0;
+
   while (!dps->err) {
     if(0xc0 == (*dps->p & 0xc0)) {
       if (--n > 0) {
         int offs_hi = (0x3f & *dps->p++);
-        int offs = offs_hi * 256 + *dps->p++;
+        int offs = offs_hi * 256 + (unsigned char)*dps->p++;
         debug(0, "jump: %d\n", offs);
         if(!sp) {
           sp = dps->p;
@@ -74,6 +77,13 @@ int decode_domain(parse_state_t *ps, int dmaxsz, int *dsz, char *domain) {
     } else {
       if (*dps->p) {
         debug(0, "label: %d\n", *dps->p);
+        if (*dsz + 1 + *dps->p < dmaxsz) {
+          memcpy(pd, 1 + dps->p, *dps->p);
+          pd += *dps->p;
+          *pd++ = '.';
+          *pd = 0;
+        } else {
+        }
         dps->p += 1 + *dps->p;
       } else {
         dps->err = ERR_DOMAIN_END;
@@ -140,6 +150,7 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
   if(decode_domain(ps, 255, &namelen, name)) {
     return ps->err;
   }
+  printf("Name: %s\n", name);
   if(decode_u16(ps, type)) {
     return ps->err;
   }
@@ -162,6 +173,7 @@ int decode_question(parse_state_t *ps, char *qname, uint16_t *qtype, uint16_t *q
   if(decode_domain(ps, 255, &qnamelen, qname)) {
     return ps->err;
   }
+  printf("Q Name: %s\n", qname);
   if(decode_u16(ps, qtype)) {
     return ps->err;
   }
