@@ -103,6 +103,7 @@ int main(int argc, char *argv[]) {
   }
   if (5353 == listen_port) {
     struct ipv6_mreq mreq;  /* Multicast address join structure */
+    struct ip_mreq mreq4;
     printf("You specified the port 5353, I will try to join the multicast group ff02::fb\n");
     inet_pton(AF_INET6, "ff02::fb", &v6_addr.sin6_addr);
     memcpy(&mreq.ipv6mr_multiaddr,
@@ -112,6 +113,12 @@ int main(int argc, char *argv[]) {
     mreq.ipv6mr_interface = 0;
     if ( setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) != 0 ) {
       printf("Error joining multicast group\n");
+    }
+    inet_pton(AF_INET, "224.0.0.251", &mreq4.imr_multiaddr);
+    /* Accept from any interface */
+    mreq4.imr_interface.s_addr = 0;
+    if ( setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq4, sizeof(mreq4)) != 0 ) {
+      printf("Error joining v4 multicast group\n");
     }
   }
 
