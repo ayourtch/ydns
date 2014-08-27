@@ -35,9 +35,10 @@ static void Lsetls(lua_State *L, char *key, char *value, int vlen) {
   lua_settable(L, -3);
 }
 
-static int my_header(void *arg, int req_id, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
+static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
   lua_State *L = arg;
   Lseti(L, "xid", req_id);
+  Lseti(L, "flags", flags);
   Lseti(L, "trunc", trunc);
   Lseti(L, "errcode", errcode);
   Lseti(L, "qdcount", qdcount);
