@@ -172,3 +172,30 @@ int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, u
   return ydns_encode_pdu(buf, buf_sz, qtype, name, id, opcode_flags, qdcount, ancount, nscount, arcount, qclass);
 }
 
+int ydns_encode_pdu_no_q(unsigned char **buf, int buf_sz, 
+		uint16_t id,
+		uint16_t opcode_flags, 
+		uint16_t qdcount,
+		uint16_t ancount,
+		uint16_t nscount,
+		uint16_t arcount) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+  debug("Encoding start, p:%p, pe: %p\n", (void *)p, (void *)pe);
+
+  result = result && store_16(&p, pe, id);
+  result = result && store_16(&p, pe, opcode_flags);
+  result = result && store_16(&p, pe, qdcount);
+  result = result && store_16(&p, pe, ancount);
+  result = result && store_16(&p, pe, nscount);
+  result = result && store_16(&p, pe, arcount);
+  if (result) {
+    *buf = p;
+  }
+  return result;
+}
+
+int ydns_encode_pdu_start(unsigned char **buf, int buf_sz) {
+  return ydns_encode_pdu_no_q(buf, buf_sz, 0, 0, 0, 0, 0, 0);
+}

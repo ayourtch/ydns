@@ -57,6 +57,21 @@ int ydns_encode_pdu(unsigned char **buf, int buf_sz,
                 uint16_t nscount,
                 uint16_t arcount,
                 uint16_t qclass); 
+/*
+ * An even more generic version for just the fixed portion of the PDU
+ */
+int ydns_encode_pdu_no_q(unsigned char **buf, int buf_sz,
+                uint16_t id,
+                uint16_t opcode_flags,
+                uint16_t qdcount,
+                uint16_t ancount,
+                uint16_t nscount,
+                uint16_t arcount);
+
+/* 
+ * Same as above, but with all fields zeroed 
+ */
+int ydns_encode_pdu_start(unsigned char **buf, int buf_sz);
 
 /* RR encoding */
 int ydns_encode_rr_start(unsigned char **buf, int buf_sz,
