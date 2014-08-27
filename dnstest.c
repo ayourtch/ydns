@@ -45,6 +45,12 @@ static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   return 1;
 }
 
+static int my_srv_rr(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name) {
+  printf("SRV PTR: '%s' => %s : %d (prio: %d, weight: %d) (ttl: %d)\n", domainname, name, port, prio, weight, ttl);
+  return 1;
+}
+
+
 
 decode_callbacks_t my_cb = {
   .process_header = my_header,
@@ -53,6 +59,7 @@ decode_callbacks_t my_cb = {
   .process_aaaa_rr = my_aaaa_rr,
   .process_cname_rr = my_cname_rr,
   .process_ptr_rr = my_ptr_rr,
+  .process_srv_rr = my_srv_rr,
 };
 
 
@@ -65,8 +72,9 @@ int main(int argc, char *argv[]) {
   int nread;
   socklen_t sockaddr_sz = sizeof(struct sockaddr);
 
-  if(argc < 4) {
-    printf("Usage: %s <recursive DNS> <type> <DNS name>\n", argv[0]);
+  if(argc < 5) {
+    printf("Usage: %s <recursive DNS> <port> <record type> <DNS name>\n", argv[0]);
+    printf("To query mDNS, use ff02::fb 5353 as server and port.\n");
     printf("Some useful record types:\n");
     printf("    AAAA        28    RFC3596\n");
     printf("    A            1    RFC1035\n");
@@ -106,12 +114,13 @@ int main(int argc, char *argv[]) {
 
   bzero(&server_addr, sizeof(server_addr));
   server_addr.sin6_family = AF_INET6;
-  server_addr.sin6_port = htons(53);
+  server_addr.sin6_port = htons(atoi(argv[2]));
   inet_pton(AF_INET6, argv[1], &server_addr.sin6_addr);
-  if(ydns_encode_request(&p, sizeof(buf), atoi(argv[2]), argv[3], 0x1234)) {
+  if(ydns_encode_request(&p, sizeof(buf), atoi(argv[3]), argv[4], 0x1234)) {
         enclen = p-buf;
         sendto(sock, buf, enclen, 0,
               (struct sockaddr *)&server_addr, sizeof(server_addr));
+	alarm(3);
         printf("Waiting for reply...\n");
         sockaddr_sz = sizeof(struct sockaddr);
 	nread = recvfrom(sock, buf, sizeof(buf), 0,
