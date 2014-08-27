@@ -98,6 +98,10 @@ int main(int argc, char *argv[]) {
     perror("socket");
     exit(1);
   }
+  { /* Reuse the port even if another mDNS server is running */
+    int yes = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  }
   listen_port = atoi(argv[2]);
   bzero(&v6_addr, sizeof(v6_addr));
   v6_addr.sin6_family = AF_INET6;
