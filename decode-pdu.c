@@ -261,6 +261,22 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
 	    cb->process_ptr_rr(arg, namebuf, ttl, namebuf2);
           }
 	  break;
+        case DNS_T_SRV:
+          if(cb->process_srv_rr) {
+            uint16_t prio, weight, port;
+            prdata = rdata;
+            prio = ntohs(*(uint16_t *)prdata);
+            prdata += 2;
+            weight = ntohs(*(uint16_t *)prdata);
+            prdata += 2;
+            port = ntohs(*(uint16_t *)prdata);
+            prdata += 2;
+            if(decode_domain(ps, &prdata, sizeof(namebuf2)-1, &namelen2, namebuf2)) {
+              return ps->err;
+            }
+	    cb->process_srv_rr(arg, namebuf, ttl, prio, weight, port, namebuf2);
+          }
+	  break;
 
       }
     }

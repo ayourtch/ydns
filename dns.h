@@ -33,6 +33,7 @@ enum {
   DNS_T_MX = 15,
   DNS_T_TXT = 16,
   DNS_T_AAAA = 28,
+  DNS_T_SRV = 33,
   DNS_T_X
 };
 
@@ -100,6 +101,9 @@ typedef int ((*ydns_cname_func_t)(void *arg, char *domainname, uint32_t ttl, cha
 /* We got PTR address record. Again - none of the data will persist when you return */
 typedef int ((*ydns_ptr_func_t)(void *arg, char *domainname, uint32_t ttl, char *cname));
 
+/* We got SRV address record. Again - none of the data will persist when you return */
+typedef int ((*ydns_srv_func_t)(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name));
+
 typedef struct decode_callbacks_t {
   ydns_header_func_t             process_header;
   ydns_question_func_t           process_question;
@@ -107,6 +111,7 @@ typedef struct decode_callbacks_t {
   ydns_aaaa_func_t               process_aaaa_rr;
   ydns_cname_func_t              process_cname_rr;
   ydns_ptr_func_t                process_ptr_rr;
+  ydns_srv_func_t                process_srv_rr;
 } decode_callbacks_t;
 
 
