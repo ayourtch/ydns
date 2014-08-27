@@ -129,6 +129,11 @@ int main(int argc, char *argv[]) {
         inet_pton(AF_INET6, str_addr, &v6_addr.sin6_addr);
 	sockaddr_sz = sizeof(struct sockaddr_in6);
       }
+      if (AF_INET6 == v6_addr.sin6_family) {
+        char src[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &v6_addr.sin6_addr, src, INET6_ADDRSTRLEN);
+        printf("Src: %s\n", src);
+      } 
       result = ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb);
       printf("Parse result: %d\n", result);
       if (11 == result) {
