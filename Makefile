@@ -11,6 +11,6 @@ sqlite3dns: sqlite3dns.c build-pdu.c decode-pdu.c dns.h
 ydns.so: decode-pdu.c build-pdu.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so decode-pdu.c build-pdu.c ydns.c
 clean:
-	rm -f *.o dnstest dnsstest *.so
+	rm -f *.o dnstest dnsstest sqlite3dns *.so
 	rm -rf *.dSYM
 

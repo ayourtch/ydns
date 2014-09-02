@@ -83,6 +83,8 @@ int ydns_encode_rr_start(unsigned char **buf, int buf_sz,
 int ydns_encode_rr_data(unsigned char **buf, int buf_sz,
                         void *src, int len);
 
+int ydns_encode_rr_data_domain(unsigned char **buf, int buf_sz, char *name);
+
 int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
                         char *nsname,
                         char *admin,
