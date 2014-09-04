@@ -93,6 +93,23 @@ int ydns_encode_rr_data(unsigned char **buf, int buf_sz,
   return result;
 }
 
+int ydns_encode_rr_data_domain(unsigned char **buf, int buf_sz, char *name) {
+  unsigned char *p = *buf;
+  unsigned char *plen = *buf;
+  unsigned char *ps;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+  result = result && store_16(&p, pe, 0); /* we will store the real length later */
+  ps = p;
+  result = result && store_str(&p, pe, name);
+  result = result && store_16(&plen, pe, p-ps); /* we will store the real length later */
+   
+  if (result) {
+    *buf = p;
+  }
+  return result;
+}
+
 int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
 			char *nsname,
 			char *admin,

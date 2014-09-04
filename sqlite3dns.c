@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sqlite3.h>
+#include <ctype.h>
+
 #include "dns.h"
 
 unsigned char buf[1500];
@@ -18,6 +20,11 @@ char question_name[2048];
 int question_type;
 int question_class;
 int question_id;
+
+enum { 
+  QUERY_FORWARD = 0,
+  QUERY_REVERSE
+};
 
 typedef struct {
   sqlite3 *db;
@@ -36,11 +43,14 @@ char *safe_cpy(char *dst, char *src, int sizeofdst) {
 }
 
 
-int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int outsz) {
+int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int outsz, int query_type) {
   int res;
   int ret = 0;
   sqlite3_stmt *stmt = NULL;
-  char *sql = "select value from records where name = ?1 and type = ?2;";
+  char *sql_forward = "select value from records where name = ?1 and type = ?2;";
+  char *sql_reverse = "select name from records where value = ?1 and type = ?2;";
+  char *sql = (query_type == QUERY_FORWARD) ? sql_forward : sql_reverse;
+
   printf("Checking the '%s' type %d in DB..\n", name, type);
   res = sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
   printf("res1: %d\n", res);
@@ -69,6 +79,69 @@ static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, i
   printf("After header processing: %ld long\n", ctx->p - ctx->buf);
   return 1;
 }
+
+int is_reverse_v6_query(char *query, struct in6_addr *v6_addr) {
+  /* 3.9.e.5.3.a.8.9.b.6.b.0.8.3.8.0.e.2.6.0.3.1.f.1.0.7.4.0.1.0.0.2.ip6.arpa. */
+  char *v6revdom = ".ip6.arpa.";
+  char *pe = strstr(query, v6revdom);
+  char *p = query;
+  char v6addr_text_full[INET6_ADDRSTRLEN];
+  int i = 0;
+  int res;
+  char *pt = v6addr_text_full;
+  if (!pe || strcasecmp(pe, v6revdom) || ( (2*32+9) != strlen(query))) {
+    /* match for the IPv6 reverse domain either not found or not the end of string */
+    return 0;
+  }
+  while (pe > p) {
+    /* Move to the previous character */
+    pe--;
+    if(!isxdigit(*pe)) {
+      return 0;
+    }
+    /* Store the next hex digit and move to the next dot */
+    *pt++ = *pe--; 
+    if (*pe != '.') {
+      return 0;
+    }
+    /* Every 4 hex chars is a colon */
+    if(0 == ++i % 4) {
+      *pt++ = ':';
+    }
+  }
+  *pt++ = 0;
+  printf("IPv6 reverse query, full IPv6 txt form: '%s'\n", v6addr_text_full);
+  res = inet_pton(AF_INET6, v6addr_text_full, &v6_addr);
+  return (1 == res);
+}
+
+int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
+  /* 67.1.168.192.in-addr.arpa. */
+  char *v4revdom = ".in-addr.arpa.";
+  char *pe = strstr(query, v4revdom);
+  char *p = query;
+  char *pnext;
+  int i;
+  uint8_t v4a[4];
+  int octet;
+  if (!pe) {
+    return 0;
+  }
+  for(i=0; i<4; i++) {
+    octet = strtol(p, &pnext, 10);
+    if ((octet < 0) || (octet > 255)) {
+      return 0;
+    }
+    if(*pnext != '.') {
+      return 0;
+    }
+    v4a[i] = octet;
+    p = pnext+1;
+  }
+  v4_addr->s_addr = htonl(v4a[0] + 256UL * (v4a[1] + 256UL * (v4a[2] + 256UL * v4a[3])));
+  return 1;
+}
+
 static int my_question(void *arg, char *domainname, int type, int class) {
   dns_proc_context_t *ctx = arg;
   char value_buf[256];
@@ -78,7 +151,37 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   question_type = type;
   question_class = class;
 
-  if(get_db_value(ctx, domainname, question_type, value_buf, sizeof(value_buf))) {
+  if(question_type == 12) {
+    struct in_addr v4_addr;
+    struct in6_addr v6_addr;
+    /* 
+     * We handle the reverse queries here
+     */
+    if (is_reverse_v6_query(domainname, &v6_addr)) {
+      char v6addr_text[INET6_ADDRSTRLEN];
+      inet_ntop(AF_INET6, &v6_addr, v6addr_text, INET6_ADDRSTRLEN);
+      printf("IPv6 reverse query for '%s'\n", v6addr_text);
+      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE)) {
+        printf("IPv6 reverse query answer: => '%s'\n", value_buf);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
+        ctx->nans++;
+      }
+    }
+
+    if (is_reverse_v4_query(domainname, &v4_addr)) {
+      char v4addr_text[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &v4_addr, v4addr_text, INET_ADDRSTRLEN);
+      printf("IPv4 reverse query for '%s'\n", v4addr_text);
+      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE)) {
+        printf("IPv4 reverse query answer: => '%s'\n", value_buf);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
+        ctx->nans++;
+      }
+    }
+  }
+  if(get_db_value(ctx, domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD)) {
     printf("Found answer in DB: %s\n", value_buf);
     if (question_type == 1) {
       struct in_addr v4_addr;

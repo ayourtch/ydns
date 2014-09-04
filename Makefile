@@ -14,6 +14,6 @@ fuzz-parse: fuzz-parse.c build-pdu.c decode-pdu.c dns.h
 ydns.so: decode-pdu.c build-pdu.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so decode-pdu.c build-pdu.c ydns.c
 clean:
-	rm -f *.o dnstest dnsstest *.so fuzz-parse
+	rm -f *.o dnstest dnsstest sqlite3dns fuzz-parse *.so
 	rm -rf *.dSYM
 
