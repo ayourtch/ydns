@@ -1,4 +1,4 @@
-all: dnstest dnsstest sqlite3dns
+all: dnstest dnsstest sqlite3dns fuzz-parse
 
 dnstest: decode-pdu.c build-pdu.c dnstest.c dns.h
 	gcc -g -Werror -Wall -Wno-unused -o dnstest decode-pdu.c build-pdu.c dnstest.c
@@ -8,9 +8,12 @@ dnsstest: dnsstest.c build-pdu.c decode-pdu.c dns.h
 sqlite3dns: sqlite3dns.c build-pdu.c decode-pdu.c dns.h
 	gcc -g -Werror -Wall -Wno-unused -o sqlite3dns sqlite3dns.c decode-pdu.c build-pdu.c -lsqlite3
 
+fuzz-parse: fuzz-parse.c build-pdu.c decode-pdu.c dns.h
+	gcc -g -Werror -Wall -Wno-unused -o fuzz-parse fuzz-parse.c build-pdu.c decode-pdu.c
+
 ydns.so: decode-pdu.c build-pdu.c ydns.c dns.h
 	gcc -g -I/usr/include/lua5.1 -fPIC -Wall -shared -o ydns.so decode-pdu.c build-pdu.c ydns.c
 clean:
-	rm -f *.o dnstest dnsstest *.so
+	rm -f *.o dnstest dnsstest *.so fuzz-parse
 	rm -rf *.dSYM
 
