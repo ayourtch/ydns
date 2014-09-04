@@ -3,6 +3,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
+#include <assert.h>
 #include "dns.h"
 
 enum {
@@ -10,7 +11,9 @@ enum {
   ERR_OVERRUN,
   ERR_RDATA_BIG,
   ERR_DOMAIN_END,
-  ERR_MALFORMED_NAME
+  ERR_MALFORMED_NAME,
+  ERR_RESERVED_LABEL_LEN,
+  ERR_WILD_LABEL_POINTER
 };
 
 typedef struct parse_state {
@@ -59,12 +62,21 @@ int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *doma
   dps->err = 0;
 
   *dsz = 0;
+  assert(!ps->err);
 
   while (!dps->err) {
-    if(0xc0 == (*dps->p & 0xc0)) {
+    assert(&domain_ps == dps);
+    switch((((uint8_t)*dps->p) & 0xc0)) {
+
+    case 0xc0:
       if (--n > 0) {
-        int offs_hi = (0x3f & *dps->p++);
-        int offs = offs_hi * 256 + (unsigned char)*dps->p++;
+        int offs_hi = (0x3f & (uint8_t)*dps->p++);
+        int offs = offs_hi * 256 + (uint8_t)*dps->p++;
+        assert(offs >= 0);
+        if (offs >= (ps->p - ps->pb)) {
+          ps->err = ERR_WILD_LABEL_POINTER;
+          return ps->err;
+        }
         debugx(0, "jump: %d\n", offs);
         if(!sp) {
           sp = dps->p;
@@ -74,12 +86,14 @@ int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *doma
         ps->err = ERR_MALFORMED_NAME;
         return ps->err;
       }
-    } else {
+      break;
+    case 0x00:
       if (*dps->p) {
         debugx(0, "label: %d\n", *dps->p);
-        if (*dsz + 1 + *dps->p < dmaxsz) {
-          memcpy(pd, 1 + dps->p, *dps->p);
-          pd += *dps->p;
+        assert(dsz >= 0);
+        if (*dsz + 1 + ((uint8_t)*dps->p) < dmaxsz) {
+          memcpy(pd, 1 + dps->p, (uint8_t)*dps->p);
+          pd += (uint8_t)*dps->p;
           *pd++ = '.';
           *pd = 0;
         } else {
@@ -89,6 +103,12 @@ int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *doma
         dps->err = ERR_DOMAIN_END;
         dps->p++;
       }
+      break;
+    case 0x80:
+    case 0x40: 
+      ps->err = ERR_RESERVED_LABEL_LEN;
+      return ps->err;
+      break;
     }
   }
   if(ERR_DOMAIN_END == dps->err) {
@@ -100,6 +120,7 @@ int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *doma
 }
 
 int decode_u16(parse_state_t *ps, uint16_t *val) {
+  assert(!ps->err);
   if (ps->p + 2 > ps->pe) {
     ps->p = ps->pe;
     ps->err = ERR_OVERRUN;
@@ -113,6 +134,7 @@ int decode_u16(parse_state_t *ps, uint16_t *val) {
 }
 
 int decode_u32(parse_state_t *ps, uint32_t *val) {
+  assert(!ps->err);
   if (ps->p + 4 > ps->pe) {
     ps->p = ps->pe;
     ps->err = ERR_OVERRUN;
@@ -126,6 +148,7 @@ int decode_u32(parse_state_t *ps, uint32_t *val) {
 }
 
 int get_bytestring(parse_state_t *ps, uint16_t rdlength_in, uint16_t rdlength, char *rdata) {
+  assert(!ps->err);
   if(rdlength_in < rdlength) {
     if(ps->p + rdlength <= ps->pe) {
       ps->p += rdlength;
@@ -168,7 +191,8 @@ int decode_rr(parse_state_t *ps, char *name, uint16_t *type,
 
 int decode_question(parse_state_t *ps, char *qname, uint16_t *qtype, uint16_t *qclass) {
   int qnamelen;
-
+  assert(!ps->err);
+  assert(*(ps->p)+1 || 1);
   if(decode_domain(ps, &ps->p, 255, &qnamelen, qname)) {
     return ps->err;
   }
@@ -203,6 +227,7 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
   ps->pe = ps->p + buflen;
 
   for(i=0; i<P_TOTALFIELDS; i++) {
+    assert(&pstate == ps);
     if (decode_u16(ps, &ph[i])) {
       return ps->err;
     }
@@ -214,24 +239,32 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
                             ph[P_QDCOUNT], ph[P_ANCOUNT], ph[P_NSCOUNT], ph[P_ARCOUNT]);
   }
   for(i=0; i<ph[P_QDCOUNT]; i++) {
+    assert(&pstate == ps);
+    assert(!ps->err);
     if(decode_question(ps, namebuf, &type, &class)) {
       return ps->err;
     }
+    assert(!ps->err);
+    assert(&pstate == ps);
     debug(0, "Q: type: %d class: %d\n", type, class);
     if(cb->process_question) {
       cb->process_question(arg, namebuf, type, class);
     }
+    assert(&pstate == ps);
   }
   for(i = P_ANCOUNT; i <= P_ARCOUNT; i++) {
     for(j=0; j<ph[i]; j++) {
+      assert(&pstate == ps);
       if(decode_rr(ps, namebuf, &type, &class, &ttl, &rdlength)) {
         return ps->err;
       }
+      assert(&pstate == ps);
       debug(0, "RR type: %d, class: %d, ttl: %" PRIx32 ", rdlen: %d\n", type, class, ttl, rdlength);
       /* FIXME: process RDATA according to types. */
       if(get_bytestring(ps, sizeof(rdata), rdlength, rdata)) {
         return ps->err;
       }
+      assert(&pstate == ps);
       switch(type) {
         case DNS_T_A:
           if(cb->process_a_rr) {
