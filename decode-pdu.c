@@ -93,6 +93,7 @@ int decode_domain(parse_state_t *ps, char **pp, int dmaxsz, int *dsz, char *doma
         assert(dsz >= 0);
         if (*dsz + 1 + ((uint8_t)*dps->p) < dmaxsz) {
           memcpy(pd, 1 + dps->p, (uint8_t)*dps->p);
+          dmaxsz -= (uint8_t)*dps->p;
           pd += (uint8_t)*dps->p;
           *pd++ = '.';
           *pd = 0;
@@ -314,6 +315,7 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
       }
     }
   }
+  printf("Err: %d\n", ps->err);
   return ps->err;
 }
 
