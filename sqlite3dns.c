@@ -188,9 +188,18 @@ int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
 static int my_question(void *arg, char *domainname, int type, int class) {
   dns_proc_context_t *ctx = arg;
   char value_buf[256];
-
+  char mapped_domainname[256];
+  char *dot_pos;
+  
   printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
+  
   safe_cpy(question_name, domainname, sizeof(question_name));
+  safe_cpy(mapped_domainname, domainname, sizeof(mapped_domainname));
+  dot_pos = strchr(mapped_domainname, '.');
+  if(dot_pos) {
+    safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
+  }
+ 
   question_type = type;
   question_class = class;
   if( (!ctx->is_mdns) && (0 == ctx->nquest) ) {
@@ -228,7 +237,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       }
     }
   }
-  if(get_db_value(ctx, domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS)) {
+  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE)) {
     printf("Found answer in DB: %s\n", value_buf);
     if (question_type == 1) {
       struct in_addr v4_addr;
