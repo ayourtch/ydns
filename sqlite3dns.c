@@ -242,6 +242,10 @@ static int my_question(void *arg, char *domainname, int type, int class) {
     if (question_type == 1) {
       struct in_addr v4_addr;
       int res = inet_pton(AF_INET, value_buf, &v4_addr);
+      if (!ctx->is_mdns) {
+        /* We don't serve A records when authoritative... */
+        return 1;
+      }
       if (res > 0) {
         ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
         ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v4_addr, 4);
