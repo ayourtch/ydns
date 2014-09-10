@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sqlite3.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "dns.h"
 
@@ -44,6 +45,38 @@ char *safe_cpy(char *dst, char *src, int sizeofdst) {
   return dst;
 }
 
+int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char *value, int vlan, int expire, int info_source) {
+  int res;
+  int ret = 0;
+  sqlite3_stmt *stmt = NULL;
+  char *sql_cache = "insert into cache values(?1, ?2, ?3, ?4, ?5, ?6);";
+  char *sql_rec = "insert into records values(?1, ?2, ?3, ?4, ?5, ?6);";
+  char *sql = (QUERY_SRC_CACHE == info_source) ? sql_cache : sql_rec;
+
+  printf("Inserting '%s' => '%s' (type %d) into DB with expire %d on vlan %d..\n", name, value, type, expire, vlan);
+  res = sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
+  printf("res1: %d\n", res);
+  res = sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
+  printf("res2: %d\n", res);
+  res = sqlite3_bind_int(stmt, 2, class);
+  printf("res3: %d\n", res);
+  res = sqlite3_bind_int(stmt, 3, type);
+  printf("res3: %d\n", res);
+  res = sqlite3_bind_int(stmt, 4, vlan);
+  printf("res3: %d\n", res);
+  res = sqlite3_bind_int(stmt, 5, expire);
+  printf("res3: %d\n", res);
+  res = sqlite3_bind_text(stmt, 6, value, strlen(value), SQLITE_TRANSIENT);
+  printf("res3: %d\n", res);
+  res = sqlite3_step(stmt);
+  printf("res4: %d\n", res);
+  printf("Out: %s\n", sqlite3_column_text(stmt, 0));
+   
+  res = sqlite3_finalize(stmt);
+  printf("res5: %d\n", res);
+  return ret; 
+  
+}
 
 int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int outsz, int query_type, int info_source) {
   int res;
@@ -232,9 +265,59 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   return 1;
 }
 
+
+static int my_a_rr(void *arg, char *domainname, uint32_t ttl, uint32_t addr) {
+  dns_proc_context_t *ctx = arg;
+  char dest[INET_ADDRSTRLEN+1] = { 0 };
+  time_t now = time(NULL);
+  inet_ntop(AF_INET, &addr, dest, sizeof(dest));
+  printf("RR A: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
+  set_db_value(ctx, domainname, 1, DNS_T_A, dest, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+static int my_aaaa_rr(void *arg, char *domainname, uint32_t ttl, uint8_t *addr) {
+  dns_proc_context_t *ctx = arg;
+  char dest[INET6_ADDRSTRLEN+1] = { 0 };
+  time_t now = time(NULL);
+  inet_ntop(AF_INET6, addr, dest, sizeof(dest));
+  printf("RR AAAA: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
+  set_db_value(ctx, domainname, 1, DNS_T_AAAA, dest, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+static int my_cname_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
+  dns_proc_context_t *ctx = arg;
+  time_t now = time(NULL);
+  printf("RR CNAME: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
+  set_db_value(ctx, domainname, 1, DNS_T_CNAME, cname, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
+  dns_proc_context_t *ctx = arg;
+  time_t now = time(NULL);
+  printf("RR PTR: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
+  set_db_value(ctx, domainname, 1, DNS_T_PTR, cname, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+
+static int my_srv_rr(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name) {
+  dns_proc_context_t *ctx = arg;
+  time_t now = time(NULL);
+  #define INT_NUM_MAX 21
+  char fullstr[255+3*(1+INT_NUM_MAX)];
+  printf("SRV PTR: '%s' => %s : %d (prio: %d, weight: %d) (ttl: %d)\n", domainname, name, port, prio, weight, ttl);
+  snprintf(fullstr, sizeof(fullstr), "%d %d %d %s", prio, weight, port, name);
+  set_db_value(ctx, domainname, 1, DNS_T_SRV, fullstr, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+
 decode_callbacks_t my_cb = {
   .process_header = my_header,
   .process_question = my_question,
+  .process_a_rr = my_a_rr,
+  .process_aaaa_rr = my_aaaa_rr,
+  .process_cname_rr = my_cname_rr,
+  .process_ptr_rr = my_ptr_rr,
+  .process_srv_rr = my_srv_rr,
 };
 
 #define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
