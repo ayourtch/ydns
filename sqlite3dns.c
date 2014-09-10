@@ -264,7 +264,17 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  rc = sqlite3_open(argv[3], &dns_ctx.db);
+  rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE, NULL);
+  if(rc) {
+    char *sql1 = "CREATE TABLE records (name varchar(255), class int, type int, vlan int, expire int, value varchar(255));";
+    char *sql2 = "CREATE TABLE cache (name varchar(255), class int, type int, vlan int, expire int, value varchar(255));";
+
+    fprintf(stderr, "Can not open database, trying to create from scratch\n");
+    rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
+    rc = rc || sqlite3_exec(dns_ctx.db, sql1, NULL, 0, NULL);
+    rc = rc || sqlite3_exec(dns_ctx.db, sql2, NULL, 0, NULL);
+
+  }
   if(rc) {
     fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(dns_ctx.db));
     sqlite3_close(dns_ctx.db);
