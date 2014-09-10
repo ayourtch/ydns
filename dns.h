@@ -67,6 +67,13 @@ int ydns_encode_pdu_no_q(unsigned char **buf, int buf_sz,
                 uint16_t ancount,
                 uint16_t nscount,
                 uint16_t arcount);
+/*
+ * Encode just question alone
+ */
+int ydns_encode_question(unsigned char **buf, int buf_sz,
+                char *name,
+                uint16_t qtype,
+                uint16_t qclass);
 
 /* 
  * Same as above, but with all fields zeroed 

@@ -170,6 +170,23 @@ int ydns_encode_pdu(unsigned char **buf, int buf_sz,
   return result;
 }
 
+int ydns_encode_question(unsigned char **buf, int buf_sz, 
+                char *name,
+                uint16_t qtype,
+		uint16_t qclass) {
+  unsigned char *p = *buf;
+  unsigned char *pe = p + buf_sz;
+  int result = 1;
+  result = result && store_str(&p, pe, name);
+  result = result && store_16(&p, pe, qtype);
+  result = result && store_16(&p, pe, qclass);
+  if (result) {
+    *buf = p;
+  }
+  return result;
+}
+
+
 
 int ydns_encode_request(unsigned char **buf, int buf_sz, int type, char *name, uint16_t id) {
   unsigned char *p = *buf;
