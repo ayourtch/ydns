@@ -34,6 +34,7 @@ typedef struct {
   unsigned char *buf;
   unsigned char *p;
   unsigned char *pe;
+  int is_mdns;
   int nans; 
   int result;
 } dns_proc_context_t; 
@@ -353,6 +354,9 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  listen_port = atoi(argv[2]);
+  dns_ctx.is_mdns == (5353 == listen_port);
+
   rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE, NULL);
   if(rc) {
     char *sql1 = "CREATE TABLE records (name varchar(255), class int, type int, vlan int, expire int, value varchar(255));";
@@ -378,7 +382,6 @@ int main(int argc, char *argv[]) {
     int yes = 1;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
   }
-  listen_port = atoi(argv[2]);
   bzero(&v6_addr, sizeof(v6_addr));
   v6_addr.sin6_family = AF_INET6;
   v6_addr.sin6_port = htons(listen_port);
@@ -387,10 +390,10 @@ int main(int argc, char *argv[]) {
     perror("bind");
     exit(1);
   }
-  if (5353 == listen_port) {
+  if (dns_ctx.is_mdns) {
     struct ipv6_mreq mreq;  /* Multicast address join structure */
     struct ip_mreq mreq4;
-    printf("You specified the port 5353, I will try to join the multicast group ff02::fb\n");
+    printf("mDNS listener, joining the multicast groups ff02::fb and 224.0.0.251\n");
     inet_pton(AF_INET6, "ff02::fb", &v6_addr.sin6_addr);
     memcpy(&mreq.ipv6mr_multiaddr,
            &((struct sockaddr_in6*)(&v6_addr))->sin6_addr,
