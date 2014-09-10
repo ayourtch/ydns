@@ -119,7 +119,7 @@ static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, i
           req_id, flags, trunc, errcode, qdcount, ancount, nscount, arcount);
   question_id = req_id;
   ctx->result = ydns_encode_pdu_start(&ctx->p, ctx->pe - ctx->p);
-  printf("After header processing: %ld long\n", ctx->p - ctx->buf);
+  printf("After header processing: %d long\n", (int)(ctx->p - ctx->buf));
   return 1;
 }
 
@@ -463,7 +463,7 @@ int main(int argc, char *argv[]) {
         ydns_encode_pdu_no_q(&p, dns_ctx.pe - p, question_id,
                 0x8400, dns_ctx.nquest, dns_ctx.nans, dns_ctx.nauth, dns_ctx.naddtl);
         perror("before sendto");
-        printf("Length: %ld\n", (dns_ctx.p - dns_ctx.buf));
+        printf("Length: %d\n", (int)(dns_ctx.p - dns_ctx.buf));
         sendto(sock, dns_ctx.buf, (dns_ctx.p - dns_ctx.buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
         perror("sendto");
       }
