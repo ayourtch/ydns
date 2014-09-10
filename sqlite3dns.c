@@ -355,7 +355,7 @@ int main(int argc, char *argv[]) {
   }
 
   listen_port = atoi(argv[2]);
-  dns_ctx.is_mdns == (5353 == listen_port);
+  dns_ctx.is_mdns = (5353 == listen_port) ? 1 : 0;
 
   rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE, NULL);
   if(rc) {
