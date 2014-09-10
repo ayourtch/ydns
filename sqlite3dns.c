@@ -35,7 +35,10 @@ typedef struct {
   unsigned char *p;
   unsigned char *pe;
   int is_mdns;
+  int nquest;
   int nans; 
+  int naddtl;
+  int nauth;
   int result;
 } dns_proc_context_t; 
 
@@ -190,6 +193,10 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   safe_cpy(question_name, domainname, sizeof(question_name));
   question_type = type;
   question_class = class;
+  if( (!ctx->is_mdns) && (0 == ctx->nquest) ) {
+    ydns_encode_question(&ctx->p, ctx->pe - ctx->p, domainname, type, class);
+    ctx->nquest++;
+  }
 
   if(question_type == 12) {
     struct in_addr v4_addr;
@@ -434,15 +441,18 @@ int main(int argc, char *argv[]) {
       dns_ctx.buf = sendbuf;
       dns_ctx.p = sendbuf;
       dns_ctx.pe = dns_ctx.p + sizeof(sendbuf);
+      dns_ctx.nquest = 0;
       dns_ctx.nans = 0;
+      dns_ctx.nauth = 0;
+      dns_ctx.naddtl = 0;
       dns_ctx.result = 0;
 
       result = ydns_decode_reply(buf, nread, (void *)&dns_ctx, &my_cb);
       printf("Parse result: %d\n", result);
-      if(dns_ctx.nans && dns_ctx.result) {
+      if((dns_ctx.nans || (!dns_ctx.is_mdns)) && dns_ctx.result) {
         unsigned char *p = sendbuf;
         ydns_encode_pdu_no_q(&p, dns_ctx.pe - p, question_id,
-                0x8400, 0, dns_ctx.nans, 0, 0);
+                0x8400, dns_ctx.nquest, dns_ctx.nans, dns_ctx.nauth, dns_ctx.naddtl);
         perror("before sendto");
         printf("Length: %ld\n", (dns_ctx.p - dns_ctx.buf));
         sendto(sock, dns_ctx.buf, (dns_ctx.p - dns_ctx.buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
