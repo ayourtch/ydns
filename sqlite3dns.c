@@ -86,9 +86,9 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
   int res;
   int ret = 0;
   sqlite3_stmt *stmt = NULL;
-  char *sql_forward_rec = "select value from records where name = ?1 and type = ?2;";
+  char *sql_forward_rec = "select value from records where name = ?1 collate NOCASE and type = ?2 ORDER BY expire DESC limit 1;";
   char *sql_reverse_rec = "select name from records where value = ?1 and type = ?2;";
-  char *sql_forward_cache = "select value from cache where name = ?1 and type = ?2;";
+  char *sql_forward_cache = "select value from cache where name = ?1 collate NOCASE and type = ?2 and value not like 'fe80::%' ORDER BY expire DESC limit 1;";
   char *sql_reverse_cache = "select name from cache where value = ?1 and type = ?2;";
   char *sql_forward = info_source == QUERY_SRC_CACHE ? sql_forward_cache : sql_forward_rec;
   char *sql_reverse = info_source == QUERY_SRC_CACHE ? sql_reverse_cache : sql_reverse_rec;
@@ -237,7 +237,9 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       }
     }
   }
-  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE)) {
+  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
+                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE) ||
+     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS) ) ) {
     printf("Found answer in DB: %s\n", value_buf);
     if (question_type == 1) {
       struct in_addr v4_addr;
