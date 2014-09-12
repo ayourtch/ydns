@@ -196,6 +196,9 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   safe_cpy(question_name, domainname, sizeof(question_name));
   safe_cpy(mapped_domainname, domainname, sizeof(mapped_domainname));
   dot_pos = strchr(mapped_domainname, '.');
+  while(dot_pos && ('_' == *(dot_pos+1))) {
+    dot_pos = strchr(dot_pos+1, '.');
+  }
   if(dot_pos) {
     safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
   }
