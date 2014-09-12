@@ -244,7 +244,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
                      QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE) ||
      ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS) ) ) {
     printf("Found answer in DB: %s\n", value_buf);
-    if (question_type == 1) {
+    if (question_type == DNS_T_A) {
       struct in_addr v4_addr;
       int res = inet_pton(AF_INET, value_buf, &v4_addr);
       if (!ctx->is_mdns) {
@@ -259,7 +259,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       } else {
         printf("Error adding A reply\n");
       }
-    } else if (question_type == 28) {
+    } else if (question_type == DNS_T_AAAA) {
       struct in6_addr v6_addr;
       int res = inet_pton(AF_INET6, value_buf, &v6_addr);
       if (res > 0) {
@@ -270,7 +270,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       } else {
         printf("Error adding AAAA reply\n");
       }
-    } else if (question_type == 16) {
+    } else if (question_type == DNS_T_TXT) {
       unsigned char record_buf[256];
       record_buf[0] = strlen(value_buf);
       memcpy(record_buf+1, value_buf, record_buf[0]);
