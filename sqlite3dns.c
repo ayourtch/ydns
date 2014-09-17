@@ -324,11 +324,9 @@ static int my_question(void *arg, char *domainname, int type, int class) {
         printf("Added additional record for AAAA\n");
       }
     } else if (question_type == DNS_T_TXT) {
-      unsigned char record_buf[256];
-      record_buf[0] = strlen(value_buf);
-      memcpy(record_buf+1, value_buf, record_buf[0]);
+      int value_len = strlen(value_buf);
       ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
-      ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), record_buf, record_buf[0]+1);
+      ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), value_buf, value_len);
       ctx->nans++;
       printf("Added TXT reply\n");
     }
