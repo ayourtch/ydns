@@ -210,7 +210,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
     ctx->nquest++;
   }
 
-  if(question_type == 12) {
+  if(question_type == DNS_T_PTR) {
     struct in_addr v4_addr;
     struct in6_addr v6_addr;
     /* 
