@@ -295,6 +295,14 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
 	    cb->process_ptr_rr(arg, namebuf, ttl, namebuf2);
           }
 	  break;
+        case DNS_T_TXT:
+          if(cb->process_txt_rr) {
+	    if(rdlength < sizeof(rdata)) {
+              rdata[rdlength] = 0;
+            }
+	    cb->process_txt_rr(arg, namebuf, ttl, rdlength, rdata);
+          }
+          break;
         case DNS_T_SRV:
           if(cb->process_srv_rr) {
             uint16_t prio, weight, port;

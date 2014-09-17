@@ -45,6 +45,12 @@ static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   return 1;
 }
 
+static int my_txt_rr(void *arg, char *domainname, uint32_t ttl, uint16_t len, char *text) {
+  printf("RR TXT: '%s' => %s (ttl: %d)\n", domainname, text, ttl);
+  return 1;
+}
+
+
 static int my_srv_rr(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name) {
   printf("SRV PTR: '%s' => %s : %d (prio: %d, weight: %d) (ttl: %d)\n", domainname, name, port, prio, weight, ttl);
   return 1;
@@ -59,6 +65,7 @@ decode_callbacks_t my_cb = {
   .process_aaaa_rr = my_aaaa_rr,
   .process_cname_rr = my_cname_rr,
   .process_ptr_rr = my_ptr_rr,
+  .process_txt_rr = my_txt_rr,
   .process_srv_rr = my_srv_rr,
 };
 

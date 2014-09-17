@@ -92,6 +92,12 @@ int ydns_encode_rr_data(unsigned char **buf, int buf_sz,
 
 int ydns_encode_rr_data_domain(unsigned char **buf, int buf_sz, char *name);
 
+int ydns_encode_rr_srv(unsigned char **buf, int buf_sz,
+                        char *name,
+                        uint16_t port,
+                        uint16_t prio,
+                        uint16_t weight);
+
 int ydns_encode_rr_soa(unsigned char **buf, int buf_sz,
                         char *nsname,
                         char *admin,
@@ -125,6 +131,9 @@ typedef int ((*ydns_cname_func_t)(void *arg, char *domainname, uint32_t ttl, cha
 /* We got PTR address record. Again - none of the data will persist when you return */
 typedef int ((*ydns_ptr_func_t)(void *arg, char *domainname, uint32_t ttl, char *cname));
 
+/* We got TXT address record. Again - none of the data will persist when you return */
+typedef int ((*ydns_txt_func_t)(void *arg, char *domainname, uint32_t ttl, uint16_t len, char *text));
+
 /* We got SRV address record. Again - none of the data will persist when you return */
 typedef int ((*ydns_srv_func_t)(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name));
 
@@ -135,6 +144,7 @@ typedef struct decode_callbacks_t {
   ydns_aaaa_func_t               process_aaaa_rr;
   ydns_cname_func_t              process_cname_rr;
   ydns_ptr_func_t                process_ptr_rr;
+  ydns_txt_func_t                process_txt_rr;
   ydns_srv_func_t                process_srv_rr;
 } decode_callbacks_t;
 

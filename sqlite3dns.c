@@ -189,6 +189,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   dns_proc_context_t *ctx = arg;
   char value_buf[256];
   char mapped_domainname[256];
+  char mapped_trailer[256];
   char *dot_pos;
   
   printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
@@ -200,6 +201,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
     dot_pos = strchr(dot_pos+1, '.');
   }
   if(dot_pos) {
+    safe_cpy(mapped_trailer, dot_pos, sizeof(mapped_trailer));
     safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
   }
  
@@ -270,6 +272,57 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       } else {
         printf("Error adding AAAA reply\n");
       }
+    } else if (question_type == DNS_T_PTR) {
+      char *p = value_buf;
+      char unmapped_name[256];
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+      if(!ctx->is_mdns) {
+        char *pdot = strstr(p, ".local.");
+        if(pdot) {
+          *pdot = 0;
+          safe_cpy(unmapped_name, p, sizeof(unmapped_name));
+          strncat(unmapped_name, mapped_trailer, sizeof(unmapped_name) - strlen(unmapped_name) - 1);
+          p = unmapped_name;
+        }
+      }
+      ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), p);
+      ctx->nans++;
+    } else if (question_type == DNS_T_SRV) {
+      struct in6_addr v6_addr;
+      int has_v6_addr = 0;
+      char unmapped_name[256];
+      char *p = value_buf;
+      int prio, weight, port;
+      prio = strtol(p, &p, 10);
+      p++;
+      weight = strtol(p, &p, 10);
+      p++;
+      port = strtol(p, &p, 10);
+      p++;
+      if(!ctx->is_mdns) {
+        char *pdot = strstr(p, ".local.");
+	char aaaa_buf[256];
+        if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE) ) {
+	  printf("Got AAAA for SRV: %s\n", aaaa_buf);
+          has_v6_addr = inet_pton(AF_INET6, aaaa_buf, &v6_addr);
+	  printf("Has v6: %d\n", has_v6_addr);
+        }
+        if(pdot) {
+          *pdot = 0;
+          safe_cpy(unmapped_name, p, sizeof(unmapped_name));
+          strncat(unmapped_name, mapped_trailer, sizeof(unmapped_name) - strlen(unmapped_name) - 1);
+          p = unmapped_name;
+        }
+      }
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+      ctx->result = ctx->result && ydns_encode_rr_srv(&ctx->p, (ctx->pe - ctx->p), p, port, prio, weight);
+      ctx->nans++;
+      if(has_v6_addr > 0) {
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), p, DNS_T_AAAA, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v6_addr, 16);
+        ctx->naddtl++;
+        printf("Added additional record for AAAA\n");
+      }
     } else if (question_type == DNS_T_TXT) {
       unsigned char record_buf[256];
       record_buf[0] = strlen(value_buf);
@@ -325,6 +378,14 @@ static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   return 1;
 }
 
+static int my_txt_rr(void *arg, char *domainname, uint32_t ttl, uint16_t len, char *text) {
+  dns_proc_context_t *ctx = arg;
+  time_t now = time(NULL);
+  printf("RR TXT: '%s' (ttl: %d)\n", domainname, ttl);
+  set_db_value(ctx, domainname, 1, DNS_T_TXT, text, 0, now+ttl, QUERY_SRC_CACHE);
+  return 1;
+}
+
 static int my_srv_rr(void *arg, char *domainname, uint32_t ttl, uint16_t prio, uint16_t weight, uint16_t port, char *name) {
   dns_proc_context_t *ctx = arg;
   time_t now = time(NULL);
@@ -343,6 +404,7 @@ decode_callbacks_t my_cb = {
   .process_aaaa_rr = my_aaaa_rr,
   .process_cname_rr = my_cname_rr,
   .process_ptr_rr = my_ptr_rr,
+  .process_txt_rr = my_txt_rr,
   .process_srv_rr = my_srv_rr,
 };
 
