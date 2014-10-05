@@ -218,7 +218,7 @@ int ydns_decode_packet(unsigned char *buf, int buflen, void *arg, decode_callbac
   int namelen2;
   uint16_t type = 0, class = 0, rdlength = 0;
   uint32_t ttl;
-  char rdata[256], *prdata = rdata;
+  char rdata[1024], *prdata = rdata;
 
   uint16_t ph[P_TOTALFIELDS];
   int i, j;

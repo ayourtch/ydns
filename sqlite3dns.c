@@ -23,6 +23,8 @@ int question_type;
 int question_class;
 int question_id;
 
+#define DNS_BUF_SZ 1024
+
 enum { 
   QUERY_FORWARD = 0,
   QUERY_REVERSE, 
@@ -42,6 +44,7 @@ typedef struct {
   int nauth;
   int result;
   char peer[INET6_ADDRSTRLEN];
+  int sock;
 } dns_proc_context_t; 
 
 
@@ -256,7 +259,7 @@ int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
 int encode_srv_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, char *mapped_trailer) {
       struct in6_addr v6_addr;
       int has_v6_addr = 0;
-      char unmapped_name[256];
+      char unmapped_name[DNS_BUF_SZ];
       char *p = value_buf;
       int prio, weight, port;
       prio = strtol(p, &p, 10);
@@ -267,7 +270,7 @@ int encode_srv_answer(dns_proc_context_t *ctx, int question_type, char *value_bu
       p++;
       if(!ctx->is_mdns) {
         char *pdot = strstr(p, ".local.");
-	char aaaa_buf[256];
+	char aaaa_buf[DNS_BUF_SZ];
         if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE, NULL) ) {
 	  printf("Got AAAA for SRV: %s\n", aaaa_buf);
           has_v6_addr = inet_pton(AF_INET6, aaaa_buf, &v6_addr);
@@ -321,7 +324,7 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
       }
     } else if (question_type == DNS_T_PTR) {
       char *p = value_buf;
-      char unmapped_name[256];
+      char unmapped_name[DNS_BUF_SZ];
       ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
       if(!ctx->is_mdns) {
         char *pdot = strstr(p, ".local.");
@@ -346,11 +349,13 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
     return 0;
 }
 
+int send_question(int sock, char *qname, int qtype, char *qpeer);
+
 static int my_question(void *arg, char *domainname, int type, int class) {
   dns_proc_context_t *ctx = arg;
-  char value_buf[256];
-  char mapped_domainname[256];
-  char mapped_trailer[256];
+  char value_buf[DNS_BUF_SZ];
+  char mapped_domainname[DNS_BUF_SZ];
+  char mapped_trailer[DNS_BUF_SZ];
   char *dot_pos;
   struct in_addr v4_addr;
   struct in6_addr v6_addr;
@@ -407,23 +412,41 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   }
   { 
     sqlite3_int64 rowid = 0;
+    int num_ans = 0;
     while (get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
                      QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, &rowid)) {
       encode_answer(ctx, question_type, value_buf, mapped_trailer);
+      num_ans++;
     }
     rowid = 0;
     while ( (!ctx->is_mdns) && 
            get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, &rowid) )  {
       encode_answer(ctx, question_type, value_buf, mapped_trailer);
+      num_ans++;
+    }
+    if ((!ctx->is_mdns) && (question_type == DNS_T_SOA)) {
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), domainname, 6, 1, 0x5000);
+      ctx->result = ctx->result && ydns_encode_rr_soa(&ctx->p, (ctx->pe - ctx->p), domainname, "root.localhost",
+                                                   12345, 86400, 7200, 604800, 86400);
+     if(get_db_value(ctx, mapped_domainname, DNS_T_AAAA, value_buf, sizeof(value_buf), QUERY_FORWARD,
+                          ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
+        encode_answer(ctx, DNS_T_AAAA, value_buf, mapped_trailer);
+      }
+      num_ans++;
+      ctx->nans++;
+    }
+    if((!ctx->is_mdns) &&(num_ans == 0)) {
+      /* If we were asked via unicast, and did not have any answers, send a mcast query */
+      send_question(ctx->sock, mapped_domainname, question_type, "ff02::fb");
     }
   }
 
-  if(strcmp(domainname, "gateway.local.") == 0) {
-/*
-    ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), "sub.stdio.be", 6, 1, 0x5000);
-    ctx->result = ctx->result && ydns_encode_rr_soa(&ctx->p, (ctx->pe - ctx->p), "sub.stdio.be", "root.sub.stdio.be",
-						    12345, 86400, 7200, 604800, 86400);
-*/
+  if(!ctx->is_mdns) {
+    ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), mapped_trailer+1, 6, 1, 0x5000);
+    ctx->result = ctx->result && ydns_encode_rr_soa(&ctx->p, (ctx->pe - ctx->p), mapped_trailer+1, "root.localhost",
+                                                   12345, 86400, 7200, 604800, 86400);
+
+    ctx->naddtl++;
   }
   return 1;
 }
@@ -711,6 +734,7 @@ int main(int argc, char *argv[]) {
       dns_ctx.nauth = 0;
       dns_ctx.naddtl = 0;
       dns_ctx.result = 0;
+      dns_ctx.sock = sock;
       memset(dns_ctx.peer, 0, sizeof(dns_ctx.peer));
       if (AF_INET6 == v6_addr.sin6_family) {
         inet_ntop(AF_INET6, &v6_addr.sin6_addr, dns_ctx.peer, INET6_ADDRSTRLEN);
