@@ -51,6 +51,28 @@ char *safe_cpy(char *dst, char *src, int sizeofdst) {
   return dst;
 }
 
+int try_sqlite3_step(sqlite3_stmt *stmt) {
+  int res = 0;
+  do {
+    res = sqlite3_step(stmt);
+    if(res != SQLITE_DONE) {
+      printf("ERR: %d\n", res);
+    }
+  } while ((res == SQLITE_BUSY) || (res == SQLITE_LOCKED));
+  return res;
+}
+
+int try_sqlite3_exec(sqlite3 *db, char *sql) {
+  int res = 0;
+  do {
+    res = sqlite3_exec(db, sql, NULL, 0, NULL);
+    if(res != SQLITE_DONE) {
+      printf("ERR: %d\n", res);
+    }
+  } while ((res == SQLITE_BUSY) || (res == SQLITE_LOCKED));
+  return res;
+}
+
 int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char *value, int vlan, int ttl, int expire, int info_source, char *authority) {
   int res;
   int ret = 0;
@@ -69,7 +91,7 @@ int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char 
   res = res ? res : sqlite3_bind_int(stmt, 6, expire);
   res = res ? res : sqlite3_bind_text(stmt, 7, value, strlen(value), SQLITE_TRANSIENT);
   res = res ? res : sqlite3_bind_text(stmt, 8, authority, strlen(authority), SQLITE_TRANSIENT);
-  res = res ? res : sqlite3_step(stmt);
+  res = res ? res : try_sqlite3_step(stmt);
   printf("res: %d, out: %s\n", res, sqlite3_column_text(stmt, 0));
    
   res = sqlite3_finalize(stmt);
@@ -98,7 +120,7 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
   res = res ? res : sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
   res = res ? res : sqlite3_bind_int(stmt, 2, type);
   res = res ? res : sqlite3_bind_int(stmt, 3, rowid ? *rowid : 0);
-  res = res ? res : sqlite3_step(stmt);
+  res = res ? res : try_sqlite3_step(stmt);
   printf("res: %d, out: %s\n", res, sqlite3_column_text(stmt, 0));
   if (res == SQLITE_ROW) {
     safe_cpy(out, (void *)sqlite3_column_text(stmt, 0), outsz);
@@ -113,7 +135,7 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
 
 void wipe_expired_db_values(dns_proc_context_t *ctx) {
   char *sql = "delete from cache where expire - strftime('%s', 'now') < -600;";
-  int rc = sqlite3_exec(ctx->db, sql, NULL, 0, NULL);
+  int rc = try_sqlite3_exec(ctx->db, sql);
 }
 
 int get_expiring_db_values(dns_proc_context_t *ctx, char *oname, int oname_sz, int *otype, char *osrc, int osrc_sz, sqlite3_int64 *rowid) {
@@ -130,7 +152,7 @@ int get_expiring_db_values(dns_proc_context_t *ctx, char *oname, int oname_sz, i
   printf("get_expiring_db_values rowid: %lld\n", rowid ? *rowid : 0);
   res = res ? res : sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
   res = res ? res : sqlite3_bind_int64(stmt, 1, rowid ? *rowid : 0);
-  res = res ? res : sqlite3_step(stmt);
+  res = res ? res : try_sqlite3_step(stmt);
   
   printf("rowid: %lld res: %d, out: name: %s, type: %d, peer: %s\n", 
          rowid ? *rowid : -1,
@@ -661,9 +683,10 @@ int main(int argc, char *argv[]) {
       if (AF_INET6 == v6_addr.sin6_family) {
         inet_ntop(AF_INET6, &v6_addr.sin6_addr, dns_ctx.peer, INET6_ADDRSTRLEN);
       } 
-
+      try_sqlite3_exec(dns_ctx.db, "BEGIN TRANSACTION;");
       result = ydns_decode_reply(buf, nread, (void *)&dns_ctx, &my_cb);
       printf("Parse result: %d\n", result);
+      try_sqlite3_exec(dns_ctx.db, "COMMIT;");
       if((dns_ctx.nans || (!dns_ctx.is_mdns)) && dns_ctx.result) {
         unsigned char *p = sendbuf;
         ydns_encode_pdu_no_q(&p, dns_ctx.pe - p, question_id,
