@@ -105,7 +105,7 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
   sqlite3_stmt *stmt = NULL;
 
 #define FILTER " AND rowid > ?3 AND expire > strftime('%s', 'now') "
-#define ORDER " ORDER BY rowid ASC limit 1"
+#define ORDER " GROUP BY (name || type || value) ORDER BY rowid ASC limit 1"
   char *sql_forward_rec = "select value, rowid from records where name = ?1 collate NOCASE and type = ?2 " FILTER ORDER ";";
   char *sql_reverse_rec = "select name, rowid from records where value = ?1 and type = ?2 " FILTER ORDER ";";
   char *sql_forward_cache = "select value, rowid from cache where name = ?1 collate NOCASE and type = ?2 and value not like 'fe80::%'" FILTER ORDER ";";
@@ -398,11 +398,17 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       }
     }
   }
-  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
-                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL) ||
-     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, NULL) ) ) {
-    printf("Found answer in DB: %s\n", value_buf);
-    encode_answer(ctx, question_type, value_buf, mapped_trailer);
+  { 
+    sqlite3_int64 rowid = 0;
+    while (get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
+                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, &rowid)) {
+      encode_answer(ctx, question_type, value_buf, mapped_trailer);
+    }
+    rowid = 0;
+    while ( (!ctx->is_mdns) && 
+           get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, &rowid) )  {
+      encode_answer(ctx, question_type, value_buf, mapped_trailer);
+    }
   }
 
   if(strcmp(domainname, "gateway.local.") == 0) {
