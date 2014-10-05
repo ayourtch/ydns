@@ -251,69 +251,7 @@ int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
   return 1;
 }
 
-static int my_question(void *arg, char *domainname, int type, int class) {
-  dns_proc_context_t *ctx = arg;
-  char value_buf[256];
-  char mapped_domainname[256];
-  char mapped_trailer[256];
-  char *dot_pos;
-  struct in_addr v4_addr;
-  struct in6_addr v6_addr;
-  
-  printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
-  
-  safe_cpy(question_name, domainname, sizeof(question_name));
-  safe_cpy(mapped_domainname, domainname, sizeof(mapped_domainname));
-  dot_pos = strchr(mapped_domainname, '.');
-  while(dot_pos && ('_' == *(dot_pos+1))) {
-    dot_pos = strchr(dot_pos+1, '.');
-  }
-  if(dot_pos && 
-         (!is_reverse_v6_query(question_name, &v6_addr)) && 
-         (!is_reverse_v4_query(question_name, &v4_addr))) {
-    safe_cpy(mapped_trailer, dot_pos, sizeof(mapped_trailer));
-    safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
-  }
- 
-  question_type = type;
-  question_class = class;
-  if( (!ctx->is_mdns) && (0 == ctx->nquest) ) {
-    ydns_encode_question(&ctx->p, ctx->pe - ctx->p, domainname, type, class);
-    ctx->nquest++;
-  }
-
-  if(question_type == DNS_T_PTR) {
-    /* 
-     * We handle the reverse queries here
-     */
-    if (is_reverse_v6_query(domainname, &v6_addr)) {
-      char v6addr_text[INET6_ADDRSTRLEN];
-      inet_ntop(AF_INET6, &v6_addr, v6addr_text, INET6_ADDRSTRLEN);
-      printf("IPv6 reverse query for '%s'\n", v6addr_text);
-      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
-        printf("IPv6 reverse query answer: => '%s'\n", value_buf);
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
-        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
-        ctx->nans++;
-      }
-    }
-
-    if (is_reverse_v4_query(domainname, &v4_addr)) {
-      char v4addr_text[INET_ADDRSTRLEN];
-      inet_ntop(AF_INET, &v4_addr, v4addr_text, INET_ADDRSTRLEN);
-      printf("IPv4 reverse query for '%s'\n", v4addr_text);
-      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
-        printf("IPv4 reverse query answer: => '%s'\n", value_buf);
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
-        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
-        ctx->nans++;
-      }
-    }
-  }
-  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
-                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL) ||
-     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, NULL) ) ) {
-    printf("Found answer in DB: %s\n", value_buf);
+int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, char *mapped_trailer) {
     if (question_type == DNS_T_A) {
       struct in_addr v4_addr;
       int res = inet_pton(AF_INET, value_buf, &v4_addr);
@@ -398,6 +336,73 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       ctx->nans++;
       printf("Added TXT reply\n");
     }
+    return 0;
+}
+
+static int my_question(void *arg, char *domainname, int type, int class) {
+  dns_proc_context_t *ctx = arg;
+  char value_buf[256];
+  char mapped_domainname[256];
+  char mapped_trailer[256];
+  char *dot_pos;
+  struct in_addr v4_addr;
+  struct in6_addr v6_addr;
+  
+  printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
+  
+  safe_cpy(question_name, domainname, sizeof(question_name));
+  safe_cpy(mapped_domainname, domainname, sizeof(mapped_domainname));
+  dot_pos = strchr(mapped_domainname, '.');
+  while(dot_pos && ('_' == *(dot_pos+1))) {
+    dot_pos = strchr(dot_pos+1, '.');
+  }
+  if(dot_pos && 
+         (!is_reverse_v6_query(question_name, &v6_addr)) && 
+         (!is_reverse_v4_query(question_name, &v4_addr))) {
+    safe_cpy(mapped_trailer, dot_pos, sizeof(mapped_trailer));
+    safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
+  }
+ 
+  question_type = type;
+  question_class = class;
+  if( (!ctx->is_mdns) && (0 == ctx->nquest) ) {
+    ydns_encode_question(&ctx->p, ctx->pe - ctx->p, domainname, type, class);
+    ctx->nquest++;
+  }
+
+  if(question_type == DNS_T_PTR) {
+    /* 
+     * We handle the reverse queries here
+     */
+    if (is_reverse_v6_query(domainname, &v6_addr)) {
+      char v6addr_text[INET6_ADDRSTRLEN];
+      inet_ntop(AF_INET6, &v6_addr, v6addr_text, INET6_ADDRSTRLEN);
+      printf("IPv6 reverse query for '%s'\n", v6addr_text);
+      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
+        printf("IPv6 reverse query answer: => '%s'\n", value_buf);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
+        ctx->nans++;
+      }
+    }
+
+    if (is_reverse_v4_query(domainname, &v4_addr)) {
+      char v4addr_text[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &v4_addr, v4addr_text, INET_ADDRSTRLEN);
+      printf("IPv4 reverse query for '%s'\n", v4addr_text);
+      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
+        printf("IPv4 reverse query answer: => '%s'\n", value_buf);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
+        ctx->nans++;
+      }
+    }
+  }
+  if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
+                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL) ||
+     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, NULL) ) ) {
+    printf("Found answer in DB: %s\n", value_buf);
+    encode_answer(ctx, question_type, value_buf, mapped_trailer);
   }
 
   if(strcmp(domainname, "gateway.local.") == 0) {
