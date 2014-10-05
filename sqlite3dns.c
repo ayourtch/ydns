@@ -112,8 +112,8 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
 }
 
 void wipe_expired_db_values(dns_proc_context_t *ctx) {
-  char *sql = "delete from cache where expire < strftime('%s', 'now');";
-  // int rc = sqlite3_exec(ctx->db, sql, NULL, 0, NULL);
+  char *sql = "delete from cache where expire - strftime('%s', 'now') < -600;";
+  int rc = sqlite3_exec(ctx->db, sql, NULL, 0, NULL);
 }
 
 int get_expiring_db_values(dns_proc_context_t *ctx, char *oname, int oname_sz, int *otype, char *osrc, int osrc_sz, sqlite3_int64 *rowid) {
