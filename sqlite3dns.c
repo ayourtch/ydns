@@ -11,6 +11,7 @@
 #include <sqlite3.h>
 #include <ctype.h>
 #include <time.h>
+#include <poll.h>
 
 #include "dns.h"
 
@@ -108,6 +109,47 @@ int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int o
   }
   res = sqlite3_finalize(stmt);
   return ret; 
+}
+
+void wipe_expired_db_values(dns_proc_context_t *ctx) {
+  char *sql = "delete from cache where expire < strftime('%s', 'now');";
+  // int rc = sqlite3_exec(ctx->db, sql, NULL, 0, NULL);
+}
+
+int get_expiring_db_values(dns_proc_context_t *ctx, char *oname, int oname_sz, int *otype, char *osrc, int osrc_sz, sqlite3_int64 *rowid) {
+  int res = 0;
+  int ret = 0;
+  sqlite3_stmt *stmt = NULL;
+  /*
+  char *sql = "select name,rowid, type,authority from cache where rowid > ?1 AND expire < 30 + strftime('%s', 'now') group by (name || type || value) order by expire ASC, rowid ASC limit 1;";
+  */
+  // char *sql = "select name, rowid, type, authority from (select name, rowid, type, authority, max(expire) mxe from cache t1 group by (t1.name || t1.type || t1.value)) mmm where mmm.mxe < 60 + strftime('%s', 'now') order by expire ASC, rowid ASC limit 1;";
+
+  char *sql = "select name, rowid, type, authority, mxe  from (select name, rowid, type, authority, max(expire) mxe from cache t1 group by (t1.name || t1.type || t1.value || t1.authority)) mmm where mmm.mxe < 60 + strftime('%s', 'now') and rowid > ?1 order by mxe ASC, rowid ASC;";
+
+  printf("get_expiring_db_values rowid: %lld\n", rowid ? *rowid : 0);
+  res = res ? res : sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
+  res = res ? res : sqlite3_bind_int64(stmt, 1, rowid ? *rowid : 0);
+  res = res ? res : sqlite3_step(stmt);
+  
+  printf("rowid: %lld res: %d, out: name: %s, type: %d, peer: %s\n", 
+         rowid ? *rowid : -1,
+         res, sqlite3_column_text(stmt, 0), sqlite3_column_int(stmt, 2), sqlite3_column_text(stmt, 3));
+  if (res == SQLITE_ROW) {
+    safe_cpy(oname, (void *)sqlite3_column_text(stmt, 0), oname_sz);
+    if(rowid) {
+      sqlite3_int64 orowid = *rowid;
+      *rowid = sqlite3_column_int64(stmt, 1);
+      printf("Updated rowid: %lld -> %lld\n", orowid, *rowid);
+    }
+    if(otype) {
+      *otype = sqlite3_column_int(stmt, 2);
+    }
+    safe_cpy(osrc, (void *)sqlite3_column_text(stmt, 3), osrc_sz);
+    ret = 1;
+  }
+  res = sqlite3_finalize(stmt);
+  return ret;
 }
 
 static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
@@ -413,6 +455,112 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
   printf("\n");
   return 0;
 }
+
+
+int make_bound_udp_socket(char *listen_addr, int listen_port) {
+  int sock = -1;
+  struct sockaddr_in6 v6_addr;
+
+  if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
+    perror("socket");
+    return -1;
+  }
+  { /* Reuse the port even if another mDNS server is running */
+    int yes = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+#ifdef SO_REUSEPORT
+    setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
+#endif
+  }
+  bzero(&v6_addr, sizeof(v6_addr));
+  v6_addr.sin6_family = AF_INET6;
+  v6_addr.sin6_port = htons(listen_port);
+  inet_pton(AF_INET6, listen_addr, &v6_addr.sin6_addr);
+  if (0 > bind(sock, (struct sockaddr *)&v6_addr, sizeof(v6_addr))) {
+    perror("bind");
+    return -1;
+  }
+  return sock;
+}
+
+
+
+int send_question(int sock, char *qname, int qtype, char *qpeer) {
+  unsigned char buf[1500];
+  unsigned char *p = buf;
+  int enclen;
+  int nsent;
+  int pton_result;
+  struct sockaddr_in6 peer_addr;
+  int sockaddr_sz = sizeof(peer_addr);
+
+  bzero(&peer_addr, sizeof(peer_addr));
+  peer_addr.sin6_family = AF_INET6;
+  peer_addr.sin6_port = htons(5353);
+  printf("Sending question to %s .. ", qpeer);
+  pton_result = inet_pton(AF_INET6, qpeer, &peer_addr.sin6_addr);
+  printf("pton %s\n", pton_result == 1 ? "success" : "fail");
+  
+
+  if(ydns_encode_request(&p, sizeof(buf), qtype, qname, 0x1234)) {
+    printf("Encoding successful!\n");
+    enclen = p-buf;
+    nsent = sendto(sock, buf, enclen, 0, (struct sockaddr *)&peer_addr, sockaddr_sz);
+    printf("Sent %d out of %d\n", nsent, enclen);
+    if(nsent < 0) {
+      perror("sending");
+    }
+    return nsent;
+  } else {
+    printf("Encoding unsuccessful...\n");
+    return -1;
+  }
+}
+
+
+int refresh_cache_records(dns_proc_context_t *ctx, int sock, int maxcount, sqlite3_int64 *rowid) {
+  int nread;
+
+  int qtype;
+  char qname[255];
+  char qpeer[255];
+  int count = 0;
+
+  printf("Refreshing records, rowid: %lld\n", rowid ? *rowid : -1);
+  while(maxcount-- && get_expiring_db_values(ctx, qname, sizeof(qname), &qtype, qpeer, sizeof(qpeer), rowid)) {
+    printf("Trying to refresh '%s' type %d => %s\n", qname, qtype, qpeer);
+
+    if(send_question(sock, qname, qtype, qpeer) > 0) {
+      count++;
+    }
+  }
+  return count;
+}
+
+static sqlite3_int64 rowid = 0;
+
+int idleloop(dns_proc_context_t *ctx, int sock) {
+  int ret;
+  int nready;
+  int nsent;
+  struct pollfd fds[1];
+  fds[0].fd = sock;
+  fds[0].events = POLLIN;
+  do {
+    nready = poll(fds, 1, 5000);
+    if(nready == 0) {
+      nsent = refresh_cache_records(ctx, sock, 10, &rowid);
+      printf("Sent %d refresh queries\n", nsent);
+      if (0 == nsent) {
+        printf("Reset rowid for refresh and wipe the expired values\n");
+	wipe_expired_db_values(ctx);
+        rowid = 0;
+      }
+    }
+  } while (nready == 0);
+  return nready;
+}
+
  
 
 int main(int argc, char *argv[]) {
@@ -456,22 +604,11 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
-    perror("socket");
+  sock = make_bound_udp_socket(argv[1], listen_port);
+  if (sock < 0) {
     exit(1);
   }
-  { /* Reuse the port even if another mDNS server is running */
-    int yes = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-  }
-  bzero(&v6_addr, sizeof(v6_addr));
-  v6_addr.sin6_family = AF_INET6;
-  v6_addr.sin6_port = htons(listen_port);
-  inet_pton(AF_INET6, argv[1], &v6_addr.sin6_addr);
-  if (0 > bind(sock, (struct sockaddr *)&v6_addr, sizeof(v6_addr))) {
-    perror("bind");
-    exit(1);
-  }
+
   if (dns_ctx.is_mdns) {
     struct ipv6_mreq mreq;  /* Multicast address join structure */
     struct ip_mreq mreq4;
@@ -495,7 +632,11 @@ int main(int argc, char *argv[]) {
   errno = 0;
   while (1) {
       printf("Waiting for a request...\n");
+      if (dns_ctx.is_mdns) {
+        idleloop(&dns_ctx, sock);
+      }
       sockaddr_sz = sizeof(v6_addr);
+      
       nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&v6_addr, &sockaddr_sz); 
       printf("Got %d bytes request, family: %d (%d/%d)..\n", nread, v6_addr.sin6_family, AF_INET, AF_INET6);
