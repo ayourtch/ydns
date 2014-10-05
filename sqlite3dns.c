@@ -40,6 +40,7 @@ typedef struct {
   int naddtl;
   int nauth;
   int result;
+  char peer[INET6_ADDRSTRLEN];
 } dns_proc_context_t; 
 
 
@@ -49,12 +50,12 @@ char *safe_cpy(char *dst, char *src, int sizeofdst) {
   return dst;
 }
 
-int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char *value, int vlan, int expire, int info_source) {
+int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char *value, int vlan, int expire, int info_source, char *authority) {
   int res;
   int ret = 0;
   sqlite3_stmt *stmt = NULL;
-  char *sql_cache = "insert into cache values(?1, ?2, ?3, ?4, ?5, ?6);";
-  char *sql_rec = "insert into records values(?1, ?2, ?3, ?4, ?5, ?6);";
+  char *sql_cache = "insert into cache values(?1, ?2, ?3, ?4, ?5, ?6, ?7);";
+  char *sql_rec = "insert into records values(?1, ?2, ?3, ?4, ?5, ?6, ?7);";
   char *sql = (QUERY_SRC_CACHE == info_source) ? sql_cache : sql_rec;
 
   printf("Inserting '%s' => '%s' (type %d) into DB with expire %d on vlan %d..\n", name, value, type, expire, vlan);
@@ -71,6 +72,8 @@ int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char 
   res = sqlite3_bind_int(stmt, 5, expire);
   printf("res3: %d\n", res);
   res = sqlite3_bind_text(stmt, 6, value, strlen(value), SQLITE_TRANSIENT);
+  printf("res3: %d\n", res);
+  res = sqlite3_bind_text(stmt, 7, authority, strlen(authority), SQLITE_TRANSIENT);
   printf("res3: %d\n", res);
   res = sqlite3_step(stmt);
   printf("res4: %d\n", res);
@@ -349,7 +352,7 @@ static int my_a_rr(void *arg, char *domainname, uint32_t ttl, uint32_t addr) {
   time_t now = time(NULL);
   inet_ntop(AF_INET, &addr, dest, sizeof(dest));
   printf("RR A: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
-  set_db_value(ctx, domainname, 1, DNS_T_A, dest, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_A, dest, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 static int my_aaaa_rr(void *arg, char *domainname, uint32_t ttl, uint8_t *addr) {
@@ -358,21 +361,21 @@ static int my_aaaa_rr(void *arg, char *domainname, uint32_t ttl, uint8_t *addr) 
   time_t now = time(NULL);
   inet_ntop(AF_INET6, addr, dest, sizeof(dest));
   printf("RR AAAA: '%s' => %s (ttl: %d)\n", domainname, dest, ttl);
-  set_db_value(ctx, domainname, 1, DNS_T_AAAA, dest, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_AAAA, dest, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 static int my_cname_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   dns_proc_context_t *ctx = arg;
   time_t now = time(NULL);
   printf("RR CNAME: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
-  set_db_value(ctx, domainname, 1, DNS_T_CNAME, cname, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_CNAME, cname, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 static int my_ptr_rr(void *arg, char *domainname, uint32_t ttl, char *cname) {
   dns_proc_context_t *ctx = arg;
   time_t now = time(NULL);
   printf("RR PTR: '%s' => %s (ttl: %d)\n", domainname, cname, ttl);
-  set_db_value(ctx, domainname, 1, DNS_T_PTR, cname, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_PTR, cname, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 
@@ -380,7 +383,7 @@ static int my_txt_rr(void *arg, char *domainname, uint32_t ttl, uint16_t len, ch
   dns_proc_context_t *ctx = arg;
   time_t now = time(NULL);
   printf("RR TXT: '%s' (ttl: %d)\n", domainname, ttl);
-  set_db_value(ctx, domainname, 1, DNS_T_TXT, text, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_TXT, text, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 
@@ -391,7 +394,7 @@ static int my_srv_rr(void *arg, char *domainname, uint32_t ttl, uint16_t prio, u
   char fullstr[255+3*(1+INT_NUM_MAX)];
   printf("SRV PTR: '%s' => %s : %d (prio: %d, weight: %d) (ttl: %d)\n", domainname, name, port, prio, weight, ttl);
   snprintf(fullstr, sizeof(fullstr), "%d %d %d %s", prio, weight, port, name);
-  set_db_value(ctx, domainname, 1, DNS_T_SRV, fullstr, 0, now+ttl, QUERY_SRC_CACHE);
+  set_db_value(ctx, domainname, 1, DNS_T_SRV, fullstr, 0, now+ttl, QUERY_SRC_CACHE, ctx->peer);
   return 1;
 }
 
@@ -445,7 +448,7 @@ int main(int argc, char *argv[]) {
   rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE, NULL);
   if(rc) {
     char *sql1 = "CREATE TABLE records (name varchar(255), class int, type int, vlan int, expire int, value varchar(255));";
-    char *sql2 = "CREATE TABLE cache (name varchar(255), class int, type int, vlan int, expire int, value varchar(255));";
+    char *sql2 = "CREATE TABLE cache (name varchar(255), class int, type int, vlan int, expire int, value varchar(255), authority varchar(255));";
 
     fprintf(stderr, "Can not open database, trying to create from scratch\n");
     rc = sqlite3_open_v2(argv[3], &dns_ctx.db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
@@ -510,11 +513,6 @@ int main(int argc, char *argv[]) {
         inet_pton(AF_INET6, str_addr, &v6_addr.sin6_addr);
 	sockaddr_sz = sizeof(struct sockaddr_in6);
       }
-      if (AF_INET6 == v6_addr.sin6_family) {
-        char src[INET6_ADDRSTRLEN];
-        inet_ntop(AF_INET6, &v6_addr.sin6_addr, src, INET6_ADDRSTRLEN);
-        printf("Src: %s\n", src);
-      } 
       memset(sendbuf, 0, sizeof(sendbuf));
       dns_ctx.buf = sendbuf;
       dns_ctx.p = sendbuf;
@@ -524,6 +522,10 @@ int main(int argc, char *argv[]) {
       dns_ctx.nauth = 0;
       dns_ctx.naddtl = 0;
       dns_ctx.result = 0;
+      memset(dns_ctx.peer, 0, sizeof(dns_ctx.peer));
+      if (AF_INET6 == v6_addr.sin6_family) {
+        inet_ntop(AF_INET6, &v6_addr.sin6_addr, dns_ctx.peer, INET6_ADDRSTRLEN);
+      } 
 
       result = ydns_decode_reply(buf, nread, (void *)&dns_ctx, &my_cb);
       printf("Parse result: %d\n", result);
