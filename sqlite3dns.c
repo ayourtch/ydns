@@ -251,6 +251,8 @@ int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
   return 1;
 }
 
+#define ANSWER_TTL 240
+
 int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, char *mapped_trailer) {
     if (question_type == DNS_T_A) {
       struct in_addr v4_addr;
@@ -260,7 +262,7 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
         return 1;
       }
       if (res > 0) {
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
         ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v4_addr, 4);
         ctx->nans++;
         printf("Added A reply\n");
@@ -271,7 +273,7 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
       struct in6_addr v6_addr;
       int res = inet_pton(AF_INET6, value_buf, &v6_addr);
       if (res > 0) {
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
         ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v6_addr, 16);
         ctx->nans++;
         printf("Added AAAA reply\n");
@@ -281,7 +283,7 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
     } else if (question_type == DNS_T_PTR) {
       char *p = value_buf;
       char unmapped_name[256];
-      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
       if(!ctx->is_mdns) {
         char *pdot = strstr(p, ".local.");
         if(pdot) {
@@ -320,18 +322,18 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
           p = unmapped_name;
         }
       }
-      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
       ctx->result = ctx->result && ydns_encode_rr_srv(&ctx->p, (ctx->pe - ctx->p), p, port, prio, weight);
       ctx->nans++;
       if(has_v6_addr > 0) {
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), p, DNS_T_AAAA, 1, 0x5);
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), p, DNS_T_AAAA, 1, ANSWER_TTL);
         ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v6_addr, 16);
         ctx->naddtl++;
         printf("Added additional record for AAAA\n");
       }
     } else if (question_type == DNS_T_TXT) {
       int value_len = strlen(value_buf);
-      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
       ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), value_buf, value_len);
       ctx->nans++;
       printf("Added TXT reply\n");
