@@ -290,7 +290,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       char v6addr_text[INET6_ADDRSTRLEN];
       inet_ntop(AF_INET6, &v6_addr, v6addr_text, INET6_ADDRSTRLEN);
       printf("IPv6 reverse query for '%s'\n", v6addr_text);
-      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS, NULL)) {
+      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
         printf("IPv6 reverse query answer: => '%s'\n", value_buf);
         ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
         ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
@@ -302,7 +302,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       char v4addr_text[INET_ADDRSTRLEN];
       inet_ntop(AF_INET, &v4_addr, v4addr_text, INET_ADDRSTRLEN);
       printf("IPv4 reverse query for '%s'\n", v4addr_text);
-      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS, NULL)) {
+      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL)) {
         printf("IPv4 reverse query answer: => '%s'\n", value_buf);
         ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
         ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
