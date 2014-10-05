@@ -253,6 +253,45 @@ int is_reverse_v4_query(char *query, struct in_addr *v4_addr) {
 
 #define ANSWER_TTL 240
 
+int encode_srv_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, char *mapped_trailer) {
+      struct in6_addr v6_addr;
+      int has_v6_addr = 0;
+      char unmapped_name[256];
+      char *p = value_buf;
+      int prio, weight, port;
+      prio = strtol(p, &p, 10);
+      p++;
+      weight = strtol(p, &p, 10);
+      p++;
+      port = strtol(p, &p, 10);
+      p++;
+      if(!ctx->is_mdns) {
+        char *pdot = strstr(p, ".local.");
+	char aaaa_buf[256];
+        if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE, NULL) ) {
+	  printf("Got AAAA for SRV: %s\n", aaaa_buf);
+          has_v6_addr = inet_pton(AF_INET6, aaaa_buf, &v6_addr);
+	  printf("Has v6: %d\n", has_v6_addr);
+        }
+        if(pdot) {
+          *pdot = 0;
+          safe_cpy(unmapped_name, p, sizeof(unmapped_name));
+          strncat(unmapped_name, mapped_trailer, sizeof(unmapped_name) - strlen(unmapped_name) - 1);
+          p = unmapped_name;
+        }
+      }
+      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
+      ctx->result = ctx->result && ydns_encode_rr_srv(&ctx->p, (ctx->pe - ctx->p), p, port, prio, weight);
+      ctx->nans++;
+      if(has_v6_addr > 0) {
+        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), p, DNS_T_AAAA, 1, ANSWER_TTL);
+        ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v6_addr, 16);
+        ctx->naddtl++;
+        printf("Added additional record for AAAA\n");
+      }
+  return 0;
+}
+
 int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, char *mapped_trailer) {
     if (question_type == DNS_T_A) {
       struct in_addr v4_addr;
@@ -296,41 +335,7 @@ int encode_answer(dns_proc_context_t *ctx, int question_type, char *value_buf, c
       ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), p);
       ctx->nans++;
     } else if (question_type == DNS_T_SRV) {
-      struct in6_addr v6_addr;
-      int has_v6_addr = 0;
-      char unmapped_name[256];
-      char *p = value_buf;
-      int prio, weight, port;
-      prio = strtol(p, &p, 10);
-      p++;
-      weight = strtol(p, &p, 10);
-      p++;
-      port = strtol(p, &p, 10);
-      p++;
-      if(!ctx->is_mdns) {
-        char *pdot = strstr(p, ".local.");
-	char aaaa_buf[256];
-        if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE, NULL) ) {
-	  printf("Got AAAA for SRV: %s\n", aaaa_buf);
-          has_v6_addr = inet_pton(AF_INET6, aaaa_buf, &v6_addr);
-	  printf("Has v6: %d\n", has_v6_addr);
-        }
-        if(pdot) {
-          *pdot = 0;
-          safe_cpy(unmapped_name, p, sizeof(unmapped_name));
-          strncat(unmapped_name, mapped_trailer, sizeof(unmapped_name) - strlen(unmapped_name) - 1);
-          p = unmapped_name;
-        }
-      }
-      ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
-      ctx->result = ctx->result && ydns_encode_rr_srv(&ctx->p, (ctx->pe - ctx->p), p, port, prio, weight);
-      ctx->nans++;
-      if(has_v6_addr > 0) {
-        ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), p, DNS_T_AAAA, 1, ANSWER_TTL);
-        ctx->result = ctx->result && ydns_encode_rr_data(&ctx->p, (ctx->pe - ctx->p), &v6_addr, 16);
-        ctx->naddtl++;
-        printf("Added additional record for AAAA\n");
-      }
+      encode_srv_answer(ctx, question_type, value_buf, mapped_trailer);
     } else if (question_type == DNS_T_TXT) {
       int value_len = strlen(value_buf);
       ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, ANSWER_TTL);
