@@ -60,61 +60,53 @@ int set_db_value(dns_proc_context_t *ctx, char *name, int class, int type, char 
 
   printf("Inserting '%s' => '%s' (type %d) into DB with ttl %d expire %d on vlan %d..\n", name, value, type, ttl, expire, vlan);
   res = sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
-  printf("res1: %d\n", res);
-  res = sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
-  printf("res2: %d\n", res);
-  res = sqlite3_bind_int(stmt, 2, class);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_int(stmt, 3, type);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_int(stmt, 4, vlan);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_int(stmt, 5, ttl);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_int(stmt, 6, expire);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_text(stmt, 7, value, strlen(value), SQLITE_TRANSIENT);
-  printf("res3: %d\n", res);
-  res = sqlite3_bind_text(stmt, 8, authority, strlen(authority), SQLITE_TRANSIENT);
-  printf("res3: %d\n", res);
-  res = sqlite3_step(stmt);
-  printf("res4: %d\n", res);
-  printf("Out: %s\n", sqlite3_column_text(stmt, 0));
+  res = res ? res : sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
+  res = res ? res : sqlite3_bind_int(stmt, 2, class);
+  res = res ? res : sqlite3_bind_int(stmt, 3, type);
+  res = res ? res : sqlite3_bind_int(stmt, 4, vlan);
+  res = res ? res : sqlite3_bind_int(stmt, 5, ttl);
+  res = res ? res : sqlite3_bind_int(stmt, 6, expire);
+  res = res ? res : sqlite3_bind_text(stmt, 7, value, strlen(value), SQLITE_TRANSIENT);
+  res = res ? res : sqlite3_bind_text(stmt, 8, authority, strlen(authority), SQLITE_TRANSIENT);
+  res = res ? res : sqlite3_step(stmt);
+  printf("res: %d, out: %s\n", res, sqlite3_column_text(stmt, 0));
    
   res = sqlite3_finalize(stmt);
-  printf("res5: %d\n", res);
   return ret; 
   
 }
 
-int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int outsz, int query_type, int info_source) {
-  int res;
+int get_db_value(dns_proc_context_t *ctx, char *name, int type, char *out, int outsz, int query_type, int info_source, sqlite3_int64 *rowid) {
+  int res = 0;
   int ret = 0;
   sqlite3_stmt *stmt = NULL;
-  char *sql_forward_rec = "select value from records where name = ?1 collate NOCASE and type = ?2 ORDER BY expire DESC limit 1;";
-  char *sql_reverse_rec = "select name from records where value = ?1 and type = ?2;";
-  char *sql_forward_cache = "select value from cache where name = ?1 collate NOCASE and type = ?2 and value not like 'fe80::%' ORDER BY expire DESC limit 1;";
-  char *sql_reverse_cache = "select name from cache where value = ?1 and type = ?2;";
+
+#define FILTER " AND rowid > ?3 AND expire > strftime('%s', 'now') "
+#define ORDER " ORDER BY rowid ASC limit 1"
+  char *sql_forward_rec = "select value, rowid from records where name = ?1 collate NOCASE and type = ?2 " FILTER ORDER ";";
+  char *sql_reverse_rec = "select name, rowid from records where value = ?1 and type = ?2 " FILTER ORDER ";";
+  char *sql_forward_cache = "select value, rowid from cache where name = ?1 collate NOCASE and type = ?2 and value not like 'fe80::%'" FILTER ORDER ";";
+  char *sql_reverse_cache = "select name, rowid from cache where value = ?1 and type = ?2 " FILTER ORDER ";";
   char *sql_forward = info_source == QUERY_SRC_CACHE ? sql_forward_cache : sql_forward_rec;
   char *sql_reverse = info_source == QUERY_SRC_CACHE ? sql_reverse_cache : sql_reverse_rec;
   char *sql = (query_type == QUERY_FORWARD) ? sql_forward : sql_reverse;
 
   printf("Checking the '%s' type %d in DB..\n", name, type);
-  res = sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
-  printf("res1: %d\n", res);
-  res = sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
-  printf("res2: %d\n", res);
-  res = sqlite3_bind_int(stmt, 2, type);
-  printf("res3: %d\n", res);
-  res = sqlite3_step(stmt);
-  printf("res4: %d\n", res);
-  printf("Out: %s\n", sqlite3_column_text(stmt, 0));
+  printf("%s\n", sql);
+  res = res ? res : sqlite3_prepare_v2(ctx->db, sql, strlen(sql), &stmt, NULL);
+  res = res ? res : sqlite3_bind_text(stmt, 1, name, strlen(name), SQLITE_TRANSIENT);
+  res = res ? res : sqlite3_bind_int(stmt, 2, type);
+  res = res ? res : sqlite3_bind_int(stmt, 3, rowid ? *rowid : 0);
+  res = res ? res : sqlite3_step(stmt);
+  printf("res: %d, out: %s\n", res, sqlite3_column_text(stmt, 0));
   if (res == SQLITE_ROW) {
     safe_cpy(out, (void *)sqlite3_column_text(stmt, 0), outsz);
+    if (rowid) {
+      *rowid = sqlite3_column_int64(stmt, 1);
+    }
     ret = 1;
   }
   res = sqlite3_finalize(stmt);
-  printf("res5: %d\n", res);
   return ret; 
 }
 
@@ -227,7 +219,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       char v6addr_text[INET6_ADDRSTRLEN];
       inet_ntop(AF_INET6, &v6_addr, v6addr_text, INET6_ADDRSTRLEN);
       printf("IPv6 reverse query for '%s'\n", v6addr_text);
-      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS)) {
+      if(get_db_value(ctx, v6addr_text, 28, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS, NULL)) {
         printf("IPv6 reverse query answer: => '%s'\n", value_buf);
         ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
         ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
@@ -239,7 +231,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       char v4addr_text[INET_ADDRSTRLEN];
       inet_ntop(AF_INET, &v4_addr, v4addr_text, INET_ADDRSTRLEN);
       printf("IPv4 reverse query for '%s'\n", v4addr_text);
-      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS)) {
+      if(get_db_value(ctx, v4addr_text, 1, value_buf, sizeof(value_buf), QUERY_REVERSE, QUERY_SRC_RECORDS, NULL)) {
         printf("IPv4 reverse query answer: => '%s'\n", value_buf);
         ctx->result = ctx->result && ydns_encode_rr_start(&ctx->p, (ctx->pe - ctx->p), question_name, question_type, 1, 0x5);
         ctx->result = ctx->result && ydns_encode_rr_data_domain(&ctx->p, (ctx->pe - ctx->p), value_buf);
@@ -248,8 +240,8 @@ static int my_question(void *arg, char *domainname, int type, int class) {
     }
   }
   if(get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf),
-                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE) ||
-     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS) ) ) {
+                     QUERY_FORWARD, ctx->is_mdns ? QUERY_SRC_RECORDS : QUERY_SRC_CACHE, NULL) ||
+     ( (!ctx->is_mdns) && get_db_value(ctx, mapped_domainname, question_type, value_buf, sizeof(value_buf), QUERY_FORWARD, QUERY_SRC_RECORDS, NULL) ) ) {
     printf("Found answer in DB: %s\n", value_buf);
     if (question_type == DNS_T_A) {
       struct in_addr v4_addr;
@@ -307,7 +299,7 @@ static int my_question(void *arg, char *domainname, int type, int class) {
       if(!ctx->is_mdns) {
         char *pdot = strstr(p, ".local.");
 	char aaaa_buf[256];
-        if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE) ) {
+        if (get_db_value(ctx, p, DNS_T_AAAA, aaaa_buf, sizeof(aaaa_buf), QUERY_FORWARD, QUERY_SRC_CACHE, NULL) ) {
 	  printf("Got AAAA for SRV: %s\n", aaaa_buf);
           has_v6_addr = inet_pton(AF_INET6, aaaa_buf, &v6_addr);
 	  printf("Has v6: %d\n", has_v6_addr);
