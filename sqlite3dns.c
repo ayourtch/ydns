@@ -197,25 +197,30 @@ int is_reverse_v6_query(char *query, struct in6_addr *v6_addr) {
     /* match for the IPv6 reverse domain either not found or not the end of string */
     return 0;
   }
+  printf("Probably a reverse query\n");
   while (pe > p) {
     /* Move to the previous character */
     pe--;
     if(!isxdigit(*pe)) {
+      printf("Not a hex digit: %c\n", *pe);
       return 0;
     }
     /* Store the next hex digit and move to the next dot */
     *pt++ = *pe--; 
-    if (*pe != '.') {
-      return 0;
-    }
-    /* Every 4 hex chars is a colon */
-    if(0 == ++i % 4) {
-      *pt++ = ':';
+    if (pe > p) {
+      if (*pe != '.') {
+        printf("Not a dot: %c\n", *pe);
+        return 0;
+      }
+      /* Every 4 hex chars is a colon */
+      if(0 == ++i % 4) {
+        *pt++ = ':';
+      }
     }
   }
   *pt++ = 0;
   printf("IPv6 reverse query, full IPv6 txt form: '%s'\n", v6addr_text_full);
-  res = inet_pton(AF_INET6, v6addr_text_full, &v6_addr);
+  res = inet_pton(AF_INET6, v6addr_text_full, v6_addr);
   return (1 == res);
 }
 
@@ -252,6 +257,8 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   char mapped_domainname[256];
   char mapped_trailer[256];
   char *dot_pos;
+  struct in_addr v4_addr;
+  struct in6_addr v6_addr;
   
   printf("Question: Name: '%s', type: %d, class: %d\n", domainname, type, class);
   
@@ -261,7 +268,9 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   while(dot_pos && ('_' == *(dot_pos+1))) {
     dot_pos = strchr(dot_pos+1, '.');
   }
-  if(dot_pos) {
+  if(dot_pos && 
+         (!is_reverse_v6_query(question_name, &v6_addr)) && 
+         (!is_reverse_v4_query(question_name, &v4_addr))) {
     safe_cpy(mapped_trailer, dot_pos, sizeof(mapped_trailer));
     safe_cpy(dot_pos, ".local.", sizeof(mapped_domainname) - (dot_pos - mapped_domainname));
   }
@@ -274,8 +283,6 @@ static int my_question(void *arg, char *domainname, int type, int class) {
   }
 
   if(question_type == DNS_T_PTR) {
-    struct in_addr v4_addr;
-    struct in6_addr v6_addr;
     /* 
      * We handle the reverse queries here
      */
