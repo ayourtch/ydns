@@ -560,6 +560,7 @@ int refresh_cache_records(dns_proc_context_t *ctx, int sock, int maxcount, sqlit
 }
 
 static sqlite3_int64 rowid = 0;
+static int reset_will_wipe = 0;
 
 int idleloop(dns_proc_context_t *ctx, int sock) {
   int ret;
@@ -574,8 +575,14 @@ int idleloop(dns_proc_context_t *ctx, int sock) {
       nsent = refresh_cache_records(ctx, sock, 10, &rowid);
       printf("Sent %d refresh queries\n", nsent);
       if (0 == nsent) {
-        printf("Reset rowid for refresh and wipe the expired values\n");
-	wipe_expired_db_values(ctx);
+        printf("Reset rowid for refresh\n");
+        if(reset_will_wipe) {
+          printf("Wipe the expired values\n");
+	  wipe_expired_db_values(ctx);
+          reset_will_wipe = 0;
+        } else {
+          reset_will_wipe = 1;
+        }
         rowid = 0;
       }
     }
