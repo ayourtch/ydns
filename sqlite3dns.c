@@ -56,10 +56,15 @@ char *safe_cpy(char *dst, char *src, int sizeofdst) {
 
 int try_sqlite3_step(sqlite3_stmt *stmt) {
   int res = 0;
+  int retries = 0;
   do {
     res = sqlite3_step(stmt);
     if(res != SQLITE_DONE) {
       printf("ERR: %d\n", res);
+      if(retries++ > 10000) {
+        sleep(1);
+        retries = 0;
+      }
     }
   } while ((res == SQLITE_BUSY) || (res == SQLITE_LOCKED));
   return res;
@@ -67,10 +72,15 @@ int try_sqlite3_step(sqlite3_stmt *stmt) {
 
 int try_sqlite3_exec(sqlite3 *db, char *sql) {
   int res = 0;
+  int retries = 0;
   do {
     res = sqlite3_exec(db, sql, NULL, 0, NULL);
     if(res != SQLITE_DONE) {
       printf("ERR: %d\n", res);
+      if(retries++ > 10000) {
+        sleep(1);
+        retries = 0;
+      }
     }
   } while ((res == SQLITE_BUSY) || (res == SQLITE_LOCKED));
   return res;
