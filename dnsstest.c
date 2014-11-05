@@ -78,20 +78,22 @@ decode_callbacks_t my_cb = {
 #define ICMP6_COOKIES 0x42
 #define ICMP6_COOKIES_SET_COOKIE 0x1
 
-void send_cookies(uint8_t msg_code, uint32_t cookie, struct sockaddr_in6 v6_addr) {
+void send_cookies(uint8_t msg_code, uint32_t cookie, uint32_t cookie2, struct sockaddr_in6 v6_addr) {
   uint8_t buf[64];
   struct icmp6_hdr *icmp = (void *)buf;
+  uint32_t *pcookie2 = (void *)(icmp+1);
 
   int fd = socket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
   socklen_t sockaddr_sz = sizeof(struct sockaddr_in6);
 
-  memset(buf, 0, sizeof(buf));
+  memset(buf, 'x', sizeof(buf));
 
   icmp->icmp6_type = ICMP6_COOKIES;
   icmp->icmp6_code = msg_code;
   icmp->icmp6_data32[0] = htonl(cookie);
+  *pcookie2 = htonl(cookie2);
 
-  sendto(fd, buf, sizeof(*icmp), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
+  sendto(fd, buf, sizeof(buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
   perror("cookies sendto");
 }
 
@@ -202,7 +204,7 @@ int main(int argc, char *argv[]) {
         printf("Cookie: %08x\n", ntohl(cookie));
 #define MOCK_COOKIE 0x12345678
         if (MOCK_COOKIE != ntohl(cookie)) {
-          send_cookies(ICMP6_COOKIES_SET_COOKIE, cookie, v6_addr);
+          send_cookies(ICMP6_COOKIES_SET_COOKIE, MOCK_COOKIE, ntohl(cookie), v6_addr);
           continue;
         } else {
           printf("Cookie is correct!\n");
