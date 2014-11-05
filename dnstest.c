@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#define __APPLE_USE_RFC_3542
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -12,7 +13,11 @@
 
 unsigned char buf[1500];
 
-
+struct ip6_dest {
+                     u_int8_t ip6d_nxt;      /* next header */
+                     u_int8_t ip6d_len;      /* length in units of 8 octets */
+             /* followed by options */
+             } __packed;
 
 
 static int my_header(void *arg, int req_id, int flags, int trunc, int errcode, int qdcount, int ancount, int nscount, int arcount) {
@@ -78,6 +83,7 @@ int main(int argc, char *argv[]) {
   int enclen;
   int nread;
   socklen_t sockaddr_sz = sizeof(struct sockaddr);
+  int misc_opt = 5;
 
   if(argc < 5) {
     printf("Usage: %s <recursive DNS> <port> <record type> <DNS name>\n", argv[0]);
@@ -117,6 +123,41 @@ int main(int argc, char *argv[]) {
   if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
     perror("socket");
     exit(1);
+  }
+  while (misc_opt < argc) {
+    if (0 == strcmp(argv[misc_opt], "option")) {
+      int on = 1;
+      uint8_t optbuf[128];
+      int extlen = 8;
+      void *popt;
+      uint32_t cookie = 0x12345678;
+      int totlen;
+      int res;
+      int i;
+      int optnum = strtol(argv[misc_opt+1], NULL, 0);
+
+      struct ip6_dest *dst = (void *)optbuf;
+      dst->ip6d_nxt = 17;
+      dst->ip6d_len = 1;
+
+      setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS,  &on, sizeof(on));
+      printf("Setting option number to: %02x\n", optnum);
+      totlen = inet6_opt_finish(optbuf, extlen, inet6_opt_append(optbuf, extlen, inet6_opt_init(optbuf, extlen), optnum, 4, 4, &popt));
+      inet6_opt_set_val(popt, 0, &cookie, 4);
+      if(setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, optbuf, totlen)) {
+        perror("setsockopt IPV6_DSTOPTS");
+      }
+      misc_opt += 2;
+    } else if (0 == strcmp(argv[misc_opt], "hoplimit")) {
+      int  hoplimit = strtol(argv[misc_opt+1], NULL, 0);
+      if (setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
+                  (char *) &hoplimit, sizeof(hoplimit)) == -1) {
+        perror("setsockopt IPV6_UNICAST_HOPS");
+      }
+      misc_opt += 2;
+    } else {
+      misc_opt++;
+    }
   }
 
   bzero(&server_addr, sizeof(server_addr));
