@@ -9,8 +9,12 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/poll.h>
+#include <time.h>
+#include <netinet/icmp6.h>
 #include "dns.h"
 
+unsigned char send_buf[1500];
 unsigned char buf[1500];
 
 struct ip6_dest {
@@ -74,16 +78,78 @@ decode_callbacks_t my_cb = {
   .process_srv_rr = my_srv_rr,
 };
 
+#define ICMP6_COOKIES 0x42
+#define ICMP6_COOKIES_SET_COOKIE 0x1
+#define ICMP6_COOKIES_UNEXPECTED_SET_COOKIE 0x02
+
+
+void send_cookies(uint8_t msg_code, uint32_t cookie, uint32_t cookie2, struct sockaddr_in6 v6_addr) {
+  uint8_t buf[64];
+  struct icmp6_hdr *icmp = (void *)buf;
+  uint32_t *pcookie2 = (void *)(icmp+1);
+
+  int fd = socket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+  socklen_t sockaddr_sz = sizeof(struct sockaddr_in6);
+
+  memset(buf, 'x', sizeof(buf));
+
+  icmp->icmp6_type = ICMP6_COOKIES;
+  icmp->icmp6_code = msg_code;
+  icmp->icmp6_data32[0] = htonl(cookie);
+  *pcookie2 = htonl(cookie2);
+
+  sendto(fd, buf, sizeof(buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
+  perror("cookies sendto");
+  close(fd);
+}
+
+void set_option(int sock, uint8_t optnum, uint32_t optval) {
+  int on = 1;
+  uint8_t optbuf[128];
+  int extlen = 8;
+  void *popt;
+  void *pbuf = optbuf;
+  int totlen;
+  int res;
+  int i;
+  uint32_t optval_n = htonl(optval);
+  int opt_len = 4;
+
+  struct ip6_dest *dst = (void *)optbuf;
+  dst->ip6d_nxt = 17;
+  dst->ip6d_len = 1;
+
+  // setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS,  &on, sizeof(on));
+  printf("Setting option number %02x to value %08x\n", optnum, optval);
+  totlen = inet6_opt_finish(optbuf, extlen, inet6_opt_append(optbuf, extlen, inet6_opt_init(optbuf, extlen), optnum, 4, 4, &popt));
+  inet6_opt_set_val(popt, 0, &optval_n, sizeof(optval_n));
+  pbuf = optbuf;
+  for(i=0;i<totlen;i++) {
+    printf(" %02x", optbuf[i]);
+  }
+  printf("\n");
+  if(setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, optbuf, totlen)) {
+    perror("setsockopt IPV6_DSTOPTS");
+  }
+}
+
 
 
 int main(int argc, char *argv[]) {
   int sock;
+  int icmp_sock;
   struct sockaddr_in6 server_addr;
-  unsigned char *p = buf;
+  struct sockaddr_in6 icmp_src_addr;
+  struct sockaddr_in6 reply_src_addr;
+  unsigned char *p = send_buf;
   int enclen;
   int nread;
   socklen_t sockaddr_sz = sizeof(struct sockaddr);
   int misc_opt = 5;
+  int using_option = 0;
+  int have_reply = 0;
+  uint32_t cookie;
+  uint8_t optnum;
 
   if(argc < 5) {
     printf("Usage: %s <recursive DNS> <port> <record type> <DNS name>\n", argv[0]);
@@ -124,32 +190,22 @@ int main(int argc, char *argv[]) {
     perror("socket");
     exit(1);
   }
+  if ((icmp_sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) == -1) {
+    perror("icmp socket");
+    exit(1);
+  }
+
+
   while (misc_opt < argc) {
     if (0 == strcmp(argv[misc_opt], "option")) {
-      int on = 1;
-      uint8_t optbuf[128];
-      int extlen = 8;
-      void *popt;
-      uint32_t cookie = htonl(0x12345678);
-      int totlen;
-      int res;
-      int i;
-      int optnum = strtol(argv[misc_opt+1], NULL, 0);
-
-      struct ip6_dest *dst = (void *)optbuf;
-      dst->ip6d_nxt = 17;
-      dst->ip6d_len = 1;
+      uint32_t optval = 42;
+      optnum = strtol(argv[misc_opt+1], NULL, 0);
       if (misc_opt + 2 < argc) {
-        cookie = htonl(strtol(argv[misc_opt+2], NULL, 0));
+        optval = strtol(argv[misc_opt+2], NULL, 0);
       }
-
-      setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS,  &on, sizeof(on));
-      printf("Setting option number to: %02x\n", optnum);
-      totlen = inet6_opt_finish(optbuf, extlen, inet6_opt_append(optbuf, extlen, inet6_opt_init(optbuf, extlen), optnum, 4, 4, &popt));
-      inet6_opt_set_val(popt, 0, &cookie, 4);
-      if(setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, optbuf, totlen)) {
-        perror("setsockopt IPV6_DSTOPTS");
-      }
+      cookie = optval;
+      set_option(sock, optnum, optval);
+      using_option = 1;
       misc_opt += 2;
     } else if (0 == strcmp(argv[misc_opt], "hoplimit")) {
       int  hoplimit = strtol(argv[misc_opt+1], NULL, 0);
@@ -163,20 +219,78 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  sockaddr_sz = sizeof(struct sockaddr);
   bzero(&server_addr, sizeof(server_addr));
   server_addr.sin6_family = AF_INET6;
   server_addr.sin6_port = htons(atoi(argv[2]));
   inet_pton(AF_INET6, argv[1], &server_addr.sin6_addr);
-  if(ydns_encode_request(&p, sizeof(buf), atoi(argv[3]), argv[4], 0x1234)) {
-        enclen = p-buf;
-        sendto(sock, buf, enclen, 0,
-              (struct sockaddr *)&server_addr, sizeof(server_addr));
-	alarm(3);
-        printf("Waiting for reply...\n");
-        sockaddr_sz = sizeof(struct sockaddr);
-	nread = recvfrom(sock, buf, sizeof(buf), 0,
-	      (struct sockaddr *)&server_addr, &sockaddr_sz);
-        printf("Parse result: %d\n", ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb));
+  if(ydns_encode_request(&p, sizeof(send_buf), atoi(argv[3]), argv[4], 0x1234)) {
+    enclen = p-send_buf;
+    if (using_option) {
+      struct pollfd pfd[2];
+      time_t time_start = time(NULL);
+      int nfds;
+      printf("Using option; sent the request\n");
+      sendto(sock, send_buf, enclen, 0,
+        (struct sockaddr *)&server_addr, sizeof(server_addr));
+      pfd[0].fd = sock;
+      pfd[1].fd = icmp_sock;
+      pfd[0].events = pfd[1].events = POLLIN;
+#define FALLBACK_TIMEOUT_MS 500
+      while(time_start + 1 > time(NULL)) {
+        int i;
+        nfds = poll(pfd, 2, FALLBACK_TIMEOUT_MS);
+        printf("poll nfds: %d\n", nfds);
+        if(pfd[0].revents & POLLIN) {
+          nread = recvfrom(sock, buf, sizeof(buf), 0,
+            (struct sockaddr *)&server_addr, &sockaddr_sz);
+          have_reply = 1;
+          break;
+        }
+        if(pfd[1].revents & POLLIN) {
+          struct icmp6_hdr *icmp = (void *)buf;
+          nread = recvfrom(icmp_sock, buf, sizeof(buf), 0,
+            (struct sockaddr *)&icmp_src_addr, &sockaddr_sz);
+          printf("Got ICMP: %d\n", icmp->icmp6_type);
+          if (icmp->icmp6_type == ICMP6_COOKIES && icmp->icmp6_code == ICMP6_COOKIES_SET_COOKIE) {
+            uint32_t suggested_cookie = ntohl(icmp->icmp6_data32[0]);
+            uint32_t *pmy_cookie = (void *)(icmp + 1);
+            printf("I sent %08x, they ask to send %08x!\n", cookie, suggested_cookie);
+            if (ntohl(*pmy_cookie) == cookie) {
+              printf("sent_cookie matches mine, let's retry with the suggested cookie\n");
+              cookie = suggested_cookie;
+              set_option(sock, optnum, cookie);
+              sendto(sock, send_buf, enclen, 0,
+                  (struct sockaddr *)&server_addr, sizeof(server_addr));
+              perror("sock_resend_with_cookie");
+            } else {
+              printf("They sent me the sent_cookie which is not mine. Someone spoofed my source ?\n");
+              send_cookies(ICMP6_COOKIES_UNEXPECTED_SET_COOKIE, 0, suggested_cookie, server_addr);
+            }
+          }
+        }
+      }
+    }
+    if(using_option) {
+      /* clear the cookie option */
+      close(sock);
+      if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+      }
+    }
+    sockaddr_sz = sizeof(struct sockaddr);
+    if (!have_reply) {
+      printf("Send the request again\n");
+      sendto(sock, send_buf, enclen, 0,
+        (struct sockaddr *)&server_addr, sizeof(server_addr));
+      perror("sendto");
+      alarm(3);
+      printf("Waiting for reply on request...\n");
+      nread = recvfrom(sock, buf, sizeof(buf), 0,
+         (struct sockaddr *)&server_addr, &sockaddr_sz);
+    }
+    printf("Parse result: %d\n", ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb));
   } else {
         printf("Could not encode name!\n");
   }

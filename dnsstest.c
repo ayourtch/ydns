@@ -95,6 +95,7 @@ void send_cookies(uint8_t msg_code, uint32_t cookie, uint32_t cookie2, struct so
 
   sendto(fd, buf, sizeof(buf), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
   perror("cookies sendto");
+  close(fd);
 }
 
 #define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
