@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/icmp6.h>
 #include "dns.h"
 
 unsigned char buf[1500];
@@ -73,6 +74,26 @@ decode_callbacks_t my_cb = {
   .process_ptr_rr = my_ptr_rr,
   .process_srv_rr = my_srv_rr,
 };
+
+#define ICMP6_COOKIES 0x42
+#define ICMP6_COOKIES_SET_COOKIE 0x1
+
+void send_cookies(uint8_t msg_code, uint32_t cookie, struct sockaddr_in6 v6_addr) {
+  uint8_t buf[64];
+  struct icmp6_hdr *icmp = (void *)buf;
+
+  int fd = socket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+  socklen_t sockaddr_sz = sizeof(struct sockaddr_in6);
+
+  memset(buf, 0, sizeof(buf));
+
+  icmp->icmp6_type = ICMP6_COOKIES;
+  icmp->icmp6_code = msg_code;
+  icmp->icmp6_data32[0] = htonl(cookie);
+
+  sendto(fd, buf, sizeof(*icmp), 0, (struct sockaddr *)&v6_addr, sockaddr_sz);
+  perror("cookies sendto");
+}
 
 #define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
 
@@ -179,6 +200,13 @@ int main(int argc, char *argv[]) {
         printf("Got some options, cmsg len: %d, opt_next result: %d, opttype: %02x, optlen: %d!\n", cmsgptr->cmsg_len, ret, opttype, optlen);
         inet6_opt_get_val(optdata, 0, &cookie, sizeof(cookie));
         printf("Cookie: %08x\n", ntohl(cookie));
+#define MOCK_COOKIE 0x12345678
+        if (MOCK_COOKIE != ntohl(cookie)) {
+          send_cookies(ICMP6_COOKIES_SET_COOKIE, cookie, v6_addr);
+          continue;
+        } else {
+          printf("Cookie is correct!\n");
+        }
       }
 
       sockaddr_sz = sizeof(v6_addr);
