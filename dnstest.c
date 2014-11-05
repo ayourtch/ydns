@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
       uint8_t optbuf[128];
       int extlen = 8;
       void *popt;
-      uint32_t cookie = 0x12345678;
+      uint32_t cookie = htonl(0x12345678);
       int totlen;
       int res;
       int i;
@@ -139,6 +139,9 @@ int main(int argc, char *argv[]) {
       struct ip6_dest *dst = (void *)optbuf;
       dst->ip6d_nxt = 17;
       dst->ip6d_len = 1;
+      if (misc_opt + 2 < argc) {
+        cookie = htonl(strtol(argv[misc_opt+2], NULL, 0));
+      }
 
       setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS,  &on, sizeof(on));
       printf("Setting option number to: %02x\n", optnum);
