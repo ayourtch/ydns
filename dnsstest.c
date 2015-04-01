@@ -1,6 +1,5 @@
 #include <sys/types.h>
 #include <sys/socket.h>
-#define __APPLE_USE_RFC_3542
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -132,60 +131,12 @@ int main(int argc, char *argv[]) {
       printf("Error joining v4 multicast group\n");
     }
   }
-  if (53 == listen_port) {
-    int on = 1;
-    setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on, sizeof(on));
-  }
 
   while (1) {
-      uint8_t optbuf[256];
-      uint8_t *p8;
-      struct cmsghdr *cmsgptr= (void*)optbuf;
-      int i;
-      uint32_t cookie;
-
-      struct iovec iov[1];
-      iov[0].iov_base=buf;
-      iov[0].iov_len=sizeof(buf);
-
-      struct msghdr message;
-      message.msg_name=&v6_addr;
-      message.msg_namelen=sizeof(v6_addr);
-      message.msg_iov=iov;
-      message.msg_iovlen=1;
-      message.msg_control=optbuf;
-      message.msg_controllen=sizeof(optbuf);
-
       printf("Waiting for a request...\n");
-      nread = recvmsg(sock, &message, 0);
-      if (nread == -1) {
-	printf("error: %s",strerror(errno));
-        exit(1);
-      } else if (message.msg_flags&MSG_TRUNC) {
-	printf("datagram too large for buffer: truncated and ignored\n");
-        continue;
-      }
-      if (message.msg_controllen != 0 && cmsgptr->cmsg_level == IPPROTO_IPV6 && cmsgptr->cmsg_type == IPV6_DSTOPTS) {
-        void *optdata;
-        uint8_t opttype;
-        socklen_t optlen;
-
-        int ret = inet6_opt_next(CMSG_DATA(cmsgptr), cmsgptr->cmsg_len - sizeof(struct cmsghdr), 0, &opttype, &optlen, &optdata);
-        p8 = optdata; // CMSG_DATA(cmsgptr);
-        for (i=0;i<20;i++){ 
-          printf(" %02x", p8 ? p8[i] : 0);
-        }
-        printf("\n");
-        printf("Got some options, cmsg len: %d, opt_next result: %d, opttype: %02x, optlen: %d!\n", cmsgptr->cmsg_len, ret, opttype, optlen);
-        inet6_opt_get_val(optdata, 0, &cookie, sizeof(cookie));
-        printf("Cookie: %08x\n", ntohl(cookie));
-      }
-
       sockaddr_sz = sizeof(v6_addr);
-      /*
       nread = recvfrom(sock, buf, sizeof(buf), 0,
 	      (struct sockaddr *)&v6_addr, &sockaddr_sz); 
-      */
       printf("Got %d bytes request, family: %d (%d/%d)..\n", nread, v6_addr.sin6_family, AF_INET, AF_INET6);
       if (AF_INET == v6_addr.sin6_family) {
         printf("IPv4 pkt on IPv4-mapped address socket, convert sockaddr into IPv6 for sendto\n");
@@ -202,7 +153,7 @@ int main(int argc, char *argv[]) {
       } 
       result = ydns_decode_reply(buf, nread, (void *)0xdeadbeef, &my_cb);
       printf("Parse result: %d\n", result);
-      if (0 == result) {
+      if (11 == result) {
         int nans = 0;
 	p = buf;
 	if ( (question_type == 28) || (question_type == 1) || (question_type == 16)) {
