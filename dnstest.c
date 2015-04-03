@@ -125,30 +125,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   while (misc_opt < argc) {
-    if (0 == strcmp(argv[misc_opt], "option")) {
-      int on = 1;
-      uint8_t optbuf[128];
-      int extlen = 8;
-      void *popt;
-      uint32_t cookie = 0x12345678;
-      int totlen;
-      int res;
-      int i;
-      int optnum = strtol(argv[misc_opt+1], NULL, 0);
-
-      struct ip6_dest *dst = (void *)optbuf;
-      dst->ip6d_nxt = 17;
-      dst->ip6d_len = 1;
-
-      setsockopt(sock, IPPROTO_IPV6, IPV6_RECVDSTOPTS,  &on, sizeof(on));
-      printf("Setting option number to: %02x\n", optnum);
-      totlen = inet6_opt_finish(optbuf, extlen, inet6_opt_append(optbuf, extlen, inet6_opt_init(optbuf, extlen), optnum, 4, 4, &popt));
-      inet6_opt_set_val(popt, 0, &cookie, 4);
-      if(setsockopt(sock, IPPROTO_IPV6, IPV6_DSTOPTS, optbuf, totlen)) {
-        perror("setsockopt IPV6_DSTOPTS");
-      }
-      misc_opt += 2;
-    } else if (0 == strcmp(argv[misc_opt], "hoplimit")) {
+    if (0 == strcmp(argv[misc_opt], "hoplimit")) {
       int  hoplimit = strtol(argv[misc_opt+1], NULL, 0);
       if (setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
                   (char *) &hoplimit, sizeof(hoplimit)) == -1) {
